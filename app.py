@@ -70,6 +70,18 @@ def register_page():
 def superadmin_dashboard():
     return render_template('superadmin/dashboard.html')
 
+@app.route('/superadmin/admins')
+def superadmin_admins():
+    return render_template('superadmin/admins.html')
+
+@app.route('/superadmin/users')
+def superadmin_users():
+    return render_template('superadmin/users.html')
+
+@app.route('/superadmin/logs')
+def superadmin_logs():
+    return render_template('superadmin/logs.html')
+
 @app.route('/admin/dashboard')
 def admin_dashboard():
     return render_template('admin/dashboard.html')
