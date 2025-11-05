@@ -2,8 +2,10 @@ services:
   - type: web
     name: smart-attendance-monolith
     runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: bash start.sh
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile - --error-logfile - app:app
     envVars:
       - key: FLASK_ENV
         value: production
@@ -15,6 +17,8 @@ services:
         generateValue: true
       - key: SECRET_KEY
         generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.11.0
 
 databases:
   - name: attendance-db
