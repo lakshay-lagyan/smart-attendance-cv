@@ -27,8 +27,8 @@ RUN mkdir -p uploads face_data faiss_index instance
 # Set default port
 ENV PORT=5000
 
-# Expose port
-EXPOSE $PORT
+# Expose port (cannot use variable in EXPOSE)
+EXPOSE 5000
 
-# Run application (use shell form to allow environment variable expansion)
-CMD gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app
+# Run application with shell form for environment variable expansion
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT} --workers 2 --timeout 120 app:app"]
