@@ -96,7 +96,38 @@ app.register_blueprint(admin_api_bp, url_prefix='/api/admin')
 app.register_blueprint(superadmin_api_bp, url_prefix='/api/superadmin')
 app.register_blueprint(user_api_bp, url_prefix='/api/user')
 
+# Initialize database on startup (works with gunicorn too)
+with app.app_context():
+    try:
+        db.create_all()
+        
+        # Create default super admin if not exists
+        if SuperAdmin.query.count() == 0:
+            superadmin = SuperAdmin(
+                name="Super Admin",
+                email="superadmin@admin.com"
+            )
+            superadmin.set_password("superadmin123")
+            db.session.add(superadmin)
+            logger.info("Created default super admin")
+        
+        # Create default admin if not exists
+        if Admin.query.count() == 0:
+            admin = Admin(
+                name="Admin",
+                email="admin@admin.com",
+                department="IT"
+            )
+            admin.set_password("admin123")
+            db.session.add(admin)
+            logger.info("Created default admin")
+        
+        db.session.commit()
+        logger.info("Database initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing database: {e}")
+        # Don't crash on init errors, let the app start
+
 if __name__ == '__main__':
-    init_database()
     port = int(os.getenv('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=(env == 'development'))
