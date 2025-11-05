@@ -24,8 +24,11 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p uploads face_data faiss_index instance
 
-# Expose port
-EXPOSE 5000
+# Set default port
+ENV PORT=5000
 
-# Run application
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120", "app:app"]
+# Expose port
+EXPOSE $PORT
+
+# Run application (use shell form to allow environment variable expansion)
+CMD gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app
