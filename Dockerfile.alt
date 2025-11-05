@@ -10,7 +10,6 @@ RUN apt-get update && apt-get install -y \
     libgl1 \
     libglib2.0-0 \
     libgomp1 \
-    bash \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
@@ -25,14 +24,14 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p uploads face_data faiss_index instance
 
-# Make start script executable
-RUN chmod +x start.sh
+# Make entrypoint executable
+RUN chmod +x entrypoint.py
 
-# Set default port (Railway will override this)
+# Set default port
 ENV PORT=5000
 
 # Expose port
 EXPOSE 5000
 
-# Use startup script that handles PORT correctly
-CMD ["/bin/bash", "start.sh"]
+# Use Python entrypoint
+CMD ["python", "entrypoint.py"]
