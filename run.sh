@@ -1,0 +1,31 @@
+#!/bin/bash
+
+echo "Starting Smart Attendance System..."
+echo ""
+
+# Check if virtual environment exists
+if [ ! -d "venv" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv venv
+fi
+
+# Activate virtual environment
+source venv/bin/activate
+
+# Install dependencies
+echo "Installing dependencies..."
+pip install -r requirements.txt
+
+# Check for .env file
+if [ ! -f ".env" ]; then
+    echo "Creating .env file from example..."
+    cp .env.example .env
+    echo "Please edit .env file with your configuration"
+    read -p "Press enter to continue..."
+fi
+
+# Run the application
+echo ""
+echo "Starting application on http://localhost:5000"
+echo ""
+python app.py

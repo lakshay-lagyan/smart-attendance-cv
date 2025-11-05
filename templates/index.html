@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - Smart Attendance{% endblock %}
+
+{% block content %}
+<div class="min-h-screen gradient-bg flex items-center justify-center px-4">
+    <div class="max-w-6xl w-full">
+        <div class="text-center text-white mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold mb-4">Smart Attendance System</h1>
+            <p class="text-xl md:text-2xl opacity-90">AI-Powered Face Recognition Attendance</p>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div class="bg-white p-8 rounded-xl card-shadow">
+                <div class="text-4xl mb-4">🚀</div>
+                <h3 class="text-xl font-bold mb-2">Fast & Accurate</h3>
+                <p class="text-gray-600">Advanced AI face recognition technology</p>
+            </div>
+            
+            <div class="bg-white p-8 rounded-xl card-shadow">
+                <div class="text-4xl mb-4">🔒</div>
+                <h3 class="text-xl font-bold mb-2">Secure</h3>
+                <p class="text-gray-600">Enterprise-grade security</p>
+            </div>
+            
+            <div class="bg-white p-8 rounded-xl card-shadow">
+                <div class="text-4xl mb-4">📊</div>
+                <h3 class="text-xl font-bold mb-2">Analytics</h3>
+                <p class="text-gray-600">Real-time attendance insights</p>
+            </div>
+        </div>
+        
+        <div class="text-center">
+            <a href="/login" class="btn-primary text-white px-8 py-4 rounded-lg text-lg font-semibold inline-block">
+                Get Started
+            </a>
+            <a href="/register" class="bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-semibold inline-block ml-4">
+                Sign Up
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

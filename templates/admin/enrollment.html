@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+
+{% block title %}Enroll Person - Admin{% endblock %}
+
+{% block extra_styles %}
+<style>
+    #video, #canvas { border-radius: 8px; }
+    .sidebar { transition: transform 0.3s ease; }
+    @media (max-width: 768px) {
+        .sidebar.hidden-mobile { transform: translateX(-100%); }
+        #video, #canvas { max-width: 100%; height: auto; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-100">
+    <div id="sidebar" class="sidebar fixed md:static w-64 bg-gradient-to-b from-blue-600 to-blue-900 text-white h-full z-50">
+        <div class="p-6 border-b border-blue-500">
+            <h1 class="text-2xl font-bold">Admin Panel</h1>
+        </div>
+        
+        <nav class="p-4">
+            <a href="/admin/dashboard" class="flex items-center p-3 mb-2 hover:bg-blue-700 rounded-lg">
+                <i class="fas fa-dashboard mr-3"></i> Dashboard
+            </a>
+            <a href="/admin/enrollment" class="flex items-center p-3 mb-2 bg-blue-700 rounded-lg">
+                <i class="fas fa-user-plus mr-3"></i> Enroll Person
+            </a>
+            <a href="/admin/requests" class="flex items-center p-3 mb-2 hover:bg-blue-700 rounded-lg">
+                <i class="fas fa-inbox mr-3"></i> Requests
+            </a>
+            <button onclick="logout()" class="w-full flex items-center p-3 mt-4 hover:bg-red-600 rounded-lg">
+                <i class="fas fa-sign-out-alt mr-3"></i> Logout
+            </button>
+        </nav>
+    </div>
+    
+    <div class="flex-1 overflow-auto">
+        <div class="bg-white shadow-sm p-4 flex justify-between items-center">
+            <button id="menuToggle" class="md:hidden text-gray-600">
+                <i class="fas fa-bars text-2xl"></i>
+            </button>
+            <h2 class="text-2xl font-bold text-gray-800">Enroll New Person</h2>
+        </div>
+        
+        <div class="p-4 md:p-6">
+            <div class="bg-white rounded-lg shadow p-6 max-w-4xl mx-auto">
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-2">Person Name</label>
+                    <input type="text" id="personName" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Enter full name">
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold mb-4">Capture Photos (At least 3 required)</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <video id="video" width="320" height="240" autoplay class="w-full bg-gray-900"></video>
+                            <div class="mt-4 space-y-2">
+                                <button id="startCamera" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
+                                    <i class="fas fa-camera mr-2"></i> Start Camera
+                                </button>
+                                <button id="captureBtn" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600" disabled>
+                                    <i class="fas fa-camera mr-2"></i> Capture Photo
+                                </button>
+                                <button id="stopCamera" class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600" disabled>
+                                    <i class="fas fa-stop mr-2"></i> Stop Camera
+                                </button>
+                            </div>
+                            <p class="mt-2 text-sm text-gray-600">Photos captured: <span id="photoCount" class="font-bold">0</span></p>
+                        </div>
+                        
+                        <div>
+                            <canvas id="canvas" width="320" height="240" class="hidden"></canvas>
+                            <div id="thumbnails" class="grid grid-cols-3 gap-2"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button id="enrollBtn" class="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 font-semibold" disabled>
+                    <i class="fas fa-check mr-2"></i> Enroll Person
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let video, canvas, ctx, stream;
+let capturedPhotos = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebar = document.getElementById('sidebar');
+    const menuToggle = document.getElementById('menuToggle');
+    
+    menuToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('hidden-mobile');
+    });
+    
+    video = document.getElementById('video');
+    canvas = document.getElementById('canvas');
+    ctx = canvas.getContext('2d');
+    
+    const startCamera = document.getElementById('startCamera');
+    const stopCamera = document.getElementById('stopCamera');
+    const captureBtn = document.getElementById('captureBtn');
+    const enrollBtn = document.getElementById('enrollBtn');
+    
+    startCamera.addEventListener('click', async () => {
+        try {
+            const constraints = {
+                video: {
+                    facingMode: 'user',
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                }
+            };
+            
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = stream;
+            
+            startCamera.disabled = true;
+            stopCamera.disabled = false;
+            captureBtn.disabled = false;
+            
+            showToast('Camera started successfully', 'success');
+        } catch (error) {
+            console.error('Camera error:', error);
+            showToast('Failed to access camera. Please check permissions.', 'error');
+        }
+    });
+    
+    stopCamera.addEventListener('click', () => {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+            
+            startCamera.disabled = false;
+            stopCamera.disabled = true;
+            captureBtn.disabled = true;
+        }
+    });
+    
+    captureBtn.addEventListener('click', () => {
+        ctx.drawImage(video, 0, 0, 320, 240);
+        const imageData = canvas.toDataURL('image/jpeg');
+        
+        capturedPhotos.push(imageData);
+        updateThumbnails();
+        updatePhotoCount();
+        
+        showToast('Photo captured!', 'success');
+    });
+    
+    enrollBtn.addEventListener('click', async () => {
+        const name = document.getElementById('personName').value.trim();
+        
+        if (!name) {
+            showToast('Please enter a name', 'error');
+            return;
+        }
+        
+        if (capturedPhotos.length < 3) {
+            showToast('Please capture at least 3 photos', 'error');
+            return;
+        }
+        
+        enrollBtn.disabled = true;
+        enrollBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Enrolling...';
+        
+        try {
+            const response = await apiRequest('/admin/enrollment/direct', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name: name,
+                    images: capturedPhotos
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showToast('Person enrolled successfully!', 'success');
+                
+                // Reset form
+                document.getElementById('personName').value = '';
+                capturedPhotos = [];
+                updateThumbnails();
+                updatePhotoCount();
+                
+                setTimeout(() => {
+                    window.location.href = '/admin/dashboard';
+                }, 1500);
+            } else {
+                showToast(data.error || 'Enrollment failed', 'error');
+                enrollBtn.disabled = false;
+                enrollBtn.innerHTML = '<i class="fas fa-check mr-2"></i> Enroll Person';
+            }
+        } catch (error) {
+            console.error('Enrollment error:', error);
+            showToast('Enrollment failed. Please try again.', 'error');
+            enrollBtn.disabled = false;
+            enrollBtn.innerHTML = '<i class="fas fa-check mr-2"></i> Enroll Person';
+        }
+    });
+});
+
+function updateThumbnails() {
+    const thumbnailsDiv = document.getElementById('thumbnails');
+    thumbnailsDiv.innerHTML = '';
+    
+    capturedPhotos.forEach((photo, index) => {
+        const div = document.createElement('div');
+        div.className = 'relative';
+        div.innerHTML = `
+            <img src="${photo}" class="w-full h-auto rounded border-2 border-blue-500">
+            <button onclick="removePhoto(${index})" 
+                class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600">
+                <i class="fas fa-times text-xs"></i>
+            </button>
+        `;
+        thumbnailsDiv.appendChild(div);
+    });
+}
+
+function removePhoto(index) {
+    capturedPhotos.splice(index, 1);
+    updateThumbnails();
+    updatePhotoCount();
+}
+
+function updatePhotoCount() {
+    document.getElementById('photoCount').textContent = capturedPhotos.length;
+    
+    const enrollBtn = document.getElementById('enrollBtn');
+    const name = document.getElementById('personName').value.trim();
+    
+    enrollBtn.disabled = !(capturedPhotos.length >= 3 && name);
+}
+
+document.getElementById('personName').addEventListener('input', updatePhotoCount);
+</script>
+{% endblock %}

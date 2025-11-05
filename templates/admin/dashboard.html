@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .sidebar {
+        transition: transform 0.3s ease;
+    }
+    @media (max-width: 768px) {
+        .sidebar.hidden-mobile {
+            transform: translateX(-100%);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-100">
+    <div id="sidebar" class="sidebar fixed md:static w-64 bg-gradient-to-b from-blue-600 to-blue-900 text-white h-full z-50">
+        <div class="p-6 border-b border-blue-500">
+            <h1 class="text-2xl font-bold">Admin Panel</h1>
+        </div>
+        
+        <nav class="p-4">
+            <a href="/admin/dashboard" class="flex items-center p-3 mb-2 bg-blue-700 rounded-lg">
+                <i class="fas fa-dashboard mr-3"></i> Dashboard
+            </a>
+            <a href="/admin/enrollment" class="flex items-center p-3 mb-2 hover:bg-blue-700 rounded-lg">
+                <i class="fas fa-user-plus mr-3"></i> Enroll Person
+            </a>
+            <a href="/admin/requests" class="flex items-center p-3 mb-2 hover:bg-blue-700 rounded-lg">
+                <i class="fas fa-inbox mr-3"></i> Enrollment Requests
+            </a>
+            <button onclick="logout()" class="w-full flex items-center p-3 mt-4 hover:bg-red-600 rounded-lg">
+                <i class="fas fa-sign-out-alt mr-3"></i> Logout
+            </button>
+        </nav>
+    </div>
+    
+    <div class="flex-1 overflow-auto">
+        <div class="bg-white shadow-sm p-4 flex justify-between items-center">
+            <button id="menuToggle" class="md:hidden text-gray-600">
+                <i class="fas fa-bars text-2xl"></i>
+            </button>
+            <h2 class="text-2xl font-bold text-gray-800">Dashboard</h2>
+            <div id="userInfo" class="text-right"></div>
+        </div>
+        
+        <div class="p-4 md:p-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Total Users</p>
+                            <p id="totalUsers" class="text-3xl font-bold text-blue-600">0</p>
+                        </div>
+                        <i class="fas fa-users text-4xl text-blue-200"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Enrolled</p>
+                            <p id="totalEnrolled" class="text-3xl font-bold text-green-600">0</p>
+                        </div>
+                        <i class="fas fa-id-card text-4xl text-green-200"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Pending Requests</p>
+                            <p id="pendingRequests" class="text-3xl font-bold text-orange-600">0</p>
+                        </div>
+                        <i class="fas fa-clock text-4xl text-orange-200"></i>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Today's Attendance</p>
+                            <p id="todayAttendance" class="text-3xl font-bold text-purple-600">0</p>
+                        </div>
+                        <i class="fas fa-calendar-check text-4xl text-purple-200"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-xl font-bold mb-4">Recent Attendance</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="p-3 text-left text-sm font-semibold text-gray-600">Name</th>
+                                <th class="p-3 text-left text-sm font-semibold text-gray-600">Time</th>
+                                <th class="p-3 text-left text-sm font-semibold text-gray-600 hidden md:table-cell">Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceTable" class="divide-y">
+                            <tr><td colspan="3" class="p-4 text-center text-gray-500">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebar = document.getElementById('sidebar');
+    const menuToggle = document.getElementById('menuToggle');
+    
+    menuToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('hidden-mobile');
+    });
+    
+    loadUserInfo();
+    loadStats();
+    loadAttendance();
+});
+
+async function loadUserInfo() {
+    try {
+        const response = await apiRequest('/auth/me');
+        const data = await response.json();
+        
+        if (response.ok) {
+            document.getElementById('userInfo').innerHTML = `
+                <p class="font-semibold text-gray-800">${data.user.name}</p>
+                <p class="text-sm text-gray-600">${data.user.email}</p>
+            `;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+async function loadStats() {
+    try {
+        const response = await apiRequest('/admin/stats');
+        const data = await response.json();
+        
+        if (response.ok) {
+            document.getElementById('totalUsers').textContent = data.total_users;
+            document.getElementById('totalEnrolled').textContent = data.total_enrolled;
+            document.getElementById('pendingRequests').textContent = data.pending_requests;
+            document.getElementById('todayAttendance').textContent = data.today_attendance;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+async function loadAttendance() {
+    try {
+        const response = await apiRequest('/admin/attendance?per_page=10');
+        const data = await response.json();
+        
+        if (response.ok && data.attendance.length > 0) {
+            const attendanceHTML = data.attendance.map(a => `
+                <tr>
+                    <td class="p-3">${a.name}</td>
+                    <td class="p-3 text-sm">${new Date(a.timestamp).toLocaleString()}</td>
+                    <td class="p-3 hidden md:table-cell">
+                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                            ${(a.confidence * 100).toFixed(1)}%
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+            
+            document.getElementById('attendanceTable').innerHTML = attendanceHTML;
+        } else {
+            document.getElementById('attendanceTable').innerHTML = 
+                '<tr><td colspan="3" class="p-4 text-center text-gray-500">No attendance records</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+</script>
+{% endblock %}

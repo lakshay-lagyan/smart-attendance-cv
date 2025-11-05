@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+
+{% block title %}User Dashboard{% endblock %}
+
+{% block extra_styles %}
+<style>
+    #video, #canvas { border-radius: 8px; }
+    .sidebar { transition: transform 0.3s ease; }
+    @media (max-width: 768px) {
+        .sidebar.hidden-mobile { transform: translateX(-100%); }
+        #video { max-width: 100%; height: auto; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-100">
+    <div id="sidebar" class="sidebar fixed md:static w-64 bg-gradient-to-b from-green-600 to-green-900 text-white h-full z-50">
+        <div class="p-6 border-b border-green-500">
+            <h1 class="text-2xl font-bold">User Panel</h1>
+        </div>
+        
+        <nav class="p-4">
+            <a href="/user/dashboard" class="flex items-center p-3 mb-2 bg-green-700 rounded-lg">
+                <i class="fas fa-dashboard mr-3"></i> Dashboard
+            </a>
+            <button onclick="logout()" class="w-full flex items-center p-3 mt-4 hover:bg-red-600 rounded-lg">
+                <i class="fas fa-sign-out-alt mr-3"></i> Logout
+            </button>
+        </nav>
+    </div>
+    
+    <div class="flex-1 overflow-auto">
+        <div class="bg-white shadow-sm p-4 flex justify-between items-center">
+            <button id="menuToggle" class="md:hidden text-gray-600">
+                <i class="fas fa-bars text-2xl"></i>
+            </button>
+            <h2 class="text-2xl font-bold text-gray-800">Dashboard</h2>
+            <div id="userInfo" class="text-right"></div>
+        </div>
+        
+        <div class="p-4 md:p-6">
+            <!-- Enrollment Status -->
+            <div id="enrollmentStatus" class="mb-6"></div>
+            
+            <!-- Mark Attendance Section -->
+            <div id="attendanceSection" class="bg-white rounded-lg shadow p-6 mb-6 hidden">
+                <h3 class="text-xl font-bold mb-4">Mark Attendance</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <video id="video" width="320" height="240" autoplay class="w-full bg-gray-900"></video>
+                        <div class="mt-4 space-y-2">
+                            <button id="startCamera" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
+                                <i class="fas fa-camera mr-2"></i> Start Camera
+                            </button>
+                            <button id="markAttendance" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600" disabled>
+                                <i class="fas fa-check mr-2"></i> Mark Attendance
+                            </button>
+                            <button id="stopCamera" class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600" disabled>
+                                <i class="fas fa-stop mr-2"></i> Stop Camera
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-center">
+                        <canvas id="canvas" width="320" height="240" class="hidden"></canvas>
+                        <div id="attendanceResult" class="text-center"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Enrollment Form -->
+            <div id="enrollmentForm" class="bg-white rounded-lg shadow p-6 mb-6 hidden">
+                <h3 class="text-xl font-bold mb-4">Submit Enrollment Request</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <video id="enrollVideo" width="320" height="240" autoplay class="w-full bg-gray-900"></video>
+                        <div class="mt-4 space-y-2">
+                            <button id="startEnrollCamera" class="w-full bg-green-500 text-white py-2 rounded-lg hover:bg-green-600">
+                                <i class="fas fa-camera mr-2"></i> Start Camera
+                            </button>
+                            <button id="captureEnroll" class="w-full bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600" disabled>
+                                <i class="fas fa-camera mr-2"></i> Capture Photo
+                            </button>
+                            <button id="stopEnrollCamera" class="w-full bg-red-500 text-white py-2 rounded-lg hover:bg-red-600" disabled>
+                                <i class="fas fa-stop mr-2"></i> Stop Camera
+                            </button>
+                        </div>
+                        <p class="mt-2 text-sm text-gray-600">Photos: <span id="enrollPhotoCount" class="font-bold">0</span>/3</p>
+                    </div>
+                    
+                    <div>
+                        <canvas id="enrollCanvas" width="320" height="240" class="hidden"></canvas>
+                        <div id="enrollThumbnails" class="grid grid-cols-3 gap-2"></div>
+                        <button id="submitEnrollment" class="w-full mt-4 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700" disabled>
+                            <i class="fas fa-paper-plane mr-2"></i> Submit Request
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Attendance History -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-xl font-bold mb-4">Attendance History</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="p-3 text-left">Date</th>
+                                <th class="p-3 text-left">Time</th>
+                                <th class="p-3 text-left hidden md:table-cell">Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTable" class="divide-y">
+                            <tr><td colspan="3" class="p-4 text-center text-gray-500">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let video, canvas, ctx, stream;
+let enrollVideo, enrollCanvas, enrollCtx, enrollStream;
+let enrollPhotos = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebar = document.getElementById('sidebar');
+    const menuToggle = document.getElementById('menuToggle');
+    
+    menuToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('hidden-mobile');
+    });
+    
+    video = document.getElementById('video');
+    canvas = document.getElementById('canvas');
+    ctx = canvas.getContext('2d');
+    
+    enrollVideo = document.getElementById('enrollVideo');
+    enrollCanvas = document.getElementById('enrollCanvas');
+    enrollCtx = enrollCanvas.getContext('2d');
+    
+    loadUserInfo();
+    checkEnrollmentStatus();
+    loadHistory();
+    
+    setupAttendanceCamera();
+    setupEnrollmentCamera();
+});
+
+async function loadUserInfo() {
+    try {
+        const response = await apiRequest('/auth/me');
+        const data = await response.json();
+        
+        if (response.ok) {
+            document.getElementById('userInfo').innerHTML = `
+                <p class="font-semibold text-gray-800">${data.user.name}</p>
+                <p class="text-sm text-gray-600">${data.user.email}</p>
+            `;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+async function checkEnrollmentStatus() {
+    try {
+        const response = await apiRequest('/user/enrollment/status');
+        const data = await response.json();
+        
+        if (response.ok) {
+            if (data.is_enrolled) {
+                document.getElementById('enrollmentStatus').innerHTML = `
+                    <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                        <i class="fas fa-check-circle mr-2"></i> You are enrolled. You can mark attendance.
+                    </div>
+                `;
+                document.getElementById('attendanceSection').classList.remove('hidden');
+            } else if (data.latest_request && data.latest_request.status === 'pending') {
+                document.getElementById('enrollmentStatus').innerHTML = `
+                    <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+                        <i class="fas fa-clock mr-2"></i> Your enrollment request is pending approval.
+                    </div>
+                `;
+            } else {
+                document.getElementById('enrollmentStatus').innerHTML = `
+                    <div class="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
+                        <i class="fas fa-info-circle mr-2"></i> Please submit an enrollment request to use attendance marking.
+                    </div>
+                `;
+                document.getElementById('enrollmentForm').classList.remove('hidden');
+            }
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+function setupAttendanceCamera() {
+    const startCamera = document.getElementById('startCamera');
+    const stopCamera = document.getElementById('stopCamera');
+    const markBtn = document.getElementById('markAttendance');
+    
+    startCamera.addEventListener('click', async () => {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+            });
+            video.srcObject = stream;
+            
+            startCamera.disabled = true;
+            stopCamera.disabled = false;
+            markBtn.disabled = false;
+            
+            showToast('Camera started', 'success');
+        } catch (error) {
+            console.error('Camera error:', error);
+            showToast('Failed to access camera', 'error');
+        }
+    });
+    
+    stopCamera.addEventListener('click', () => {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+            
+            startCamera.disabled = false;
+            stopCamera.disabled = true;
+            markBtn.disabled = true;
+        }
+    });
+    
+    markBtn.addEventListener('click', async () => {
+        ctx.drawImage(video, 0, 0, 320, 240);
+        const imageData = canvas.toDataURL('image/jpeg');
+        
+        markBtn.disabled = true;
+        markBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Processing...';
+        
+        try {
+            const response = await apiRequest('/user/attendance/mark', {
+                method: 'POST',
+                body: JSON.stringify({ image: imageData })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showToast(data.message, 'success');
+                loadHistory();
+            } else {
+                showToast(data.error || 'Failed to mark attendance', 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Failed to mark attendance', 'error');
+        } finally {
+            markBtn.disabled = false;
+            markBtn.innerHTML = '<i class="fas fa-check mr-2"></i> Mark Attendance';
+        }
+    });
+}
+
+function setupEnrollmentCamera() {
+    const startCamera = document.getElementById('startEnrollCamera');
+    const stopCamera = document.getElementById('stopEnrollCamera');
+    const captureBtn = document.getElementById('captureEnroll');
+    const submitBtn = document.getElementById('submitEnrollment');
+    
+    startCamera.addEventListener('click', async () => {
+        try {
+            enrollStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }
+            });
+            enrollVideo.srcObject = enrollStream;
+            
+            startCamera.disabled = true;
+            stopCamera.disabled = false;
+            captureBtn.disabled = false;
+            
+            showToast('Camera started', 'success');
+        } catch (error) {
+            console.error('Camera error:', error);
+            showToast('Failed to access camera', 'error');
+        }
+    });
+    
+    stopCamera.addEventListener('click', () => {
+        if (enrollStream) {
+            enrollStream.getTracks().forEach(track => track.stop());
+            enrollVideo.srcObject = null;
+            
+            startCamera.disabled = false;
+            stopCamera.disabled = true;
+            captureBtn.disabled = true;
+        }
+    });
+    
+    captureBtn.addEventListener('click', () => {
+        if (enrollPhotos.length >= 5) {
+            showToast('Maximum 5 photos allowed', 'warning');
+            return;
+        }
+        
+        enrollCtx.drawImage(enrollVideo, 0, 0, 320, 240);
+        const imageData = enrollCanvas.toDataURL('image/jpeg');
+        
+        enrollPhotos.push(imageData);
+        updateEnrollThumbnails();
+        showToast('Photo captured', 'success');
+    });
+    
+    submitBtn.addEventListener('click', async () => {
+        if (enrollPhotos.length < 3) {
+            showToast('Please capture at least 3 photos', 'error');
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Submitting...';
+        
+        try {
+            const response = await apiRequest('/user/enrollment/submit', {
+                method: 'POST',
+                body: JSON.stringify({ images: enrollPhotos })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showToast('Enrollment request submitted!', 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showToast(data.error || 'Submission failed', 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i> Submit Request';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showToast('Submission failed', 'error');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i> Submit Request';
+        }
+    });
+}
+
+function updateEnrollThumbnails() {
+    const div = document.getElementById('enrollThumbnails');
+    div.innerHTML = enrollPhotos.map((photo, i) => `
+        <div class="relative">
+            <img src="${photo}" class="w-full h-auto rounded border-2 border-green-500">
+            <button onclick="removeEnrollPhoto(${i})" 
+                class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600">
+                <i class="fas fa-times text-xs"></i>
+            </button>
+        </div>
+    `).join('');
+    
+    document.getElementById('enrollPhotoCount').textContent = enrollPhotos.length;
+    document.getElementById('submitEnrollment').disabled = enrollPhotos.length < 3;
+}
+
+function removeEnrollPhoto(index) {
+    enrollPhotos.splice(index, 1);
+    updateEnrollThumbnails();
+}
+
+async function loadHistory() {
+    try {
+        const response = await apiRequest('/user/attendance/history?per_page=10');
+        const data = await response.json();
+        
+        if (response.ok && data.attendance.length > 0) {
+            const html = data.attendance.map(a => {
+                const date = new Date(a.timestamp);
+                return `
+                    <tr>
+                        <td class="p-3">${date.toLocaleDateString()}</td>
+                        <td class="p-3">${date.toLocaleTimeString()}</td>
+                        <td class="p-3 hidden md:table-cell">
+                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                                ${(a.confidence * 100).toFixed(1)}%
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            document.getElementById('historyTable').innerHTML = html;
+        } else {
+            document.getElementById('historyTable').innerHTML = 
+                '<tr><td colspan="3" class="p-4 text-center text-gray-500">No attendance records</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+</script>
+{% endblock %}

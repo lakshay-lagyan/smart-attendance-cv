@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Admins - Super Admin{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .sidebar { transition: transform 0.3s ease; }
+    @media (max-width: 768px) {
+        .sidebar.hidden-mobile { transform: translateX(-100%); }
+    }
+    .modal { display: none; }
+    .modal.active { display: flex; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-100">
+    <div id="sidebar" class="sidebar fixed md:static w-64 bg-gradient-to-b from-purple-600 to-purple-900 text-white h-full z-50">
+        <div class="p-6 border-b border-purple-500">
+            <h1 class="text-2xl font-bold">Super Admin</h1>
+        </div>
+        
+        <nav class="p-4">
+            <a href="/superadmin/dashboard" class="flex items-center p-3 mb-2 hover:bg-purple-700 rounded-lg">
+                <i class="fas fa-dashboard mr-3"></i> Dashboard
+            </a>
+            <a href="/superadmin/admins" class="flex items-center p-3 mb-2 bg-purple-700 rounded-lg">
+                <i class="fas fa-user-shield mr-3"></i> Manage Admins
+            </a>
+            <a href="/superadmin/users" class="flex items-center p-3 mb-2 hover:bg-purple-700 rounded-lg">
+                <i class="fas fa-users mr-3"></i> All Users
+            </a>
+            <a href="/superadmin/logs" class="flex items-center p-3 mb-2 hover:bg-purple-700 rounded-lg">
+                <i class="fas fa-file-alt mr-3"></i> System Logs
+            </a>
+            <button onclick="logout()" class="w-full flex items-center p-3 mt-4 hover:bg-red-600 rounded-lg">
+                <i class="fas fa-sign-out-alt mr-3"></i> Logout
+            </button>
+        </nav>
+    </div>
+    
+    <div class="flex-1 overflow-auto">
+        <div class="bg-white shadow-sm p-4 flex justify-between items-center">
+            <button id="menuToggle" class="md:hidden text-gray-600">
+                <i class="fas fa-bars text-2xl"></i>
+            </button>
+            <h2 class="text-2xl font-bold text-gray-800">Manage Admins</h2>
+            <button onclick="showCreateModal()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
+                <i class="fas fa-plus mr-2"></i> Add Admin
+            </button>
+        </div>
+        
+        <div class="p-4 md:p-6">
+            <div class="bg-white rounded-lg shadow">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="p-4 text-left">Name</th>
+                                <th class="p-4 text-left">Email</th>
+                                <th class="p-4 text-left hidden md:table-cell">Department</th>
+                                <th class="p-4 text-left">Status</th>
+                                <th class="p-4 text-left">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminsTable" class="divide-y">
+                            <tr><td colspan="5" class="p-4 text-center">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+<div id="adminModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg max-w-md w-full">
+        <div class="p-6 border-b flex justify-between items-center">
+            <h3 id="modalTitle" class="text-xl font-bold">Add Admin</h3>
+            <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        
+        <form id="adminForm" class="p-6 space-y-4">
+            <input type="hidden" id="adminId">
+            <div>
+                <label class="block font-semibold mb-2">Name</label>
+                <input type="text" id="adminName" required class="w-full px-4 py-2 border rounded-lg">
+            </div>
+            <div>
+                <label class="block font-semibold mb-2">Email</label>
+                <input type="email" id="adminEmail" required class="w-full px-4 py-2 border rounded-lg">
+            </div>
+            <div>
+                <label class="block font-semibold mb-2">Department</label>
+                <input type="text" id="adminDept" class="w-full px-4 py-2 border rounded-lg">
+            </div>
+            <div>
+                <label class="block font-semibold mb-2">Password</label>
+                <input type="password" id="adminPassword" class="w-full px-4 py-2 border rounded-lg">
+                <p class="text-sm text-gray-500 mt-1">Leave blank to keep current password</p>
+            </div>
+            <button type="submit" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
+                Save Admin
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+let admins = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebar = document.getElementById('sidebar');
+    const menuToggle = document.getElementById('menuToggle');
+    
+    menuToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('hidden-mobile');
+    });
+    
+    loadAdmins();
+    
+    document.getElementById('adminForm').addEventListener('submit', saveAdmin);
+});
+
+async function loadAdmins() {
+    try {
+        const response = await apiRequest('/superadmin/admins');
+        const data = await response.json();
+        
+        if (response.ok) {
+            admins = data.admins;
+            displayAdmins(admins);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+function displayAdmins(adminsList) {
+    const tbody = document.getElementById('adminsTable');
+    
+    if (adminsList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">No admins found</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = adminsList.map(admin => `
+        <tr>
+            <td class="p-4">${admin.name}</td>
+            <td class="p-4">${admin.email}</td>
+            <td class="p-4 hidden md:table-cell">${admin.department || 'N/A'}</td>
+            <td class="p-4">
+                <span class="px-2 py-1 rounded text-xs ${admin.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                    ${admin.is_active ? 'Active' : 'Inactive'}
+                </span>
+            </td>
+            <td class="p-4">
+                <button onclick="editAdmin(${admin.id})" class="text-blue-600 hover:text-blue-800 mr-2">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button onclick="toggleAdmin(${admin.id})" class="text-red-600 hover:text-red-800">
+                    <i class="fas fa-${admin.is_active ? 'ban' : 'check'}"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showCreateModal() {
+    document.getElementById('modalTitle').textContent = 'Add Admin';
+    document.getElementById('adminForm').reset();
+    document.getElementById('adminId').value = '';
+    document.getElementById('adminModal').classList.add('active');
+}
+
+function editAdmin(id) {
+    const admin = admins.find(a => a.id === id);
+    if (!admin) return;
+    
+    document.getElementById('modalTitle').textContent = 'Edit Admin';
+    document.getElementById('adminId').value = admin.id;
+    document.getElementById('adminName').value = admin.name;
+    document.getElementById('adminEmail').value = admin.email;
+    document.getElementById('adminDept').value = admin.department || '';
+    document.getElementById('adminPassword').value = '';
+    document.getElementById('adminModal').classList.add('active');
+}
+
+function closeModal() {
+    document.getElementById('adminModal').classList.remove('active');
+}
+
+async function saveAdmin(e) {
+    e.preventDefault();
+    
+    const id = document.getElementById('adminId').value;
+    const data = {
+        name: document.getElementById('adminName').value,
+        email: document.getElementById('adminEmail').value,
+        department: document.getElementById('adminDept').value,
+        password: document.getElementById('adminPassword').value
+    };
+    
+    try {
+        const url = id ? `/superadmin/admins/${id}` : '/superadmin/admins';
+        const method = id ? 'PUT' : 'POST';
+        
+        const response = await apiRequest(url, {
+            method: method,
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast(id ? 'Admin updated!' : 'Admin created!', 'success');
+            closeModal();
+            loadAdmins();
+        } else {
+            showToast(result.error || 'Operation failed', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Operation failed', 'error');
+    }
+}
+
+async function toggleAdmin(id) {
+    const admin = admins.find(a => a.id === id);
+    if (!admin) return;
+    
+    const action = admin.is_active ? 'deactivate' : 'activate';
+    if (!confirm(`Are you sure you want to ${action} this admin?`)) return;
+    
+    try {
+        const response = await apiRequest(`/superadmin/admins/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ is_active: !admin.is_active })
+        });
+        
+        if (response.ok) {
+            showToast(`Admin ${action}d successfully`, 'success');
+            loadAdmins();
+        } else {
+            showToast('Operation failed', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Operation failed', 'error');
+    }
+}
+</script>
+{% endblock %}

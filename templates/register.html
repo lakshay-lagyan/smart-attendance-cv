@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Register - Smart Attendance{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex items-center justify-center px-4 bg-gray-50 py-12">
+    <div class="max-w-md w-full">
+        <div class="text-center mb-8">
+            <h2 class="text-3xl font-bold gradient-text">Create Account</h2>
+            <p class="text-gray-600 mt-2">Join our smart attendance system</p>
+        </div>
+        
+        <div class="bg-white rounded-xl card-shadow p-8">
+            <form id="registerForm">
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Full Name</label>
+                    <input type="text" id="name" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Email</label>
+                    <input type="email" id="email" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Phone</label>
+                    <input type="tel" id="phone"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-semibold mb-2">Department</label>
+                    <input type="text" id="department"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-2">Password</label>
+                    <input type="password" id="password" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+                
+                <button type="submit" class="w-full btn-primary text-white py-3 rounded-lg font-semibold">
+                    Create Account
+                </button>
+            </form>
+            
+            <div class="mt-6 text-center">
+                <p class="text-gray-600">Already have an account? 
+                    <a href="/login" class="text-purple-600 font-semibold hover:underline">Sign In</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        phone: document.getElementById('phone').value,
+        department: document.getElementById('department').value,
+        password: document.getElementById('password').value
+    };
+    
+    try {
+        const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('Registration successful! Please login.', 'success');
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 1500);
+        } else {
+            showToast(result.error || 'Registration failed', 'error');
+        }
+    } catch (error) {
+        showToast('Registration failed. Please try again.', 'error');
+    }
+});
+</script>
+{% endblock %}
