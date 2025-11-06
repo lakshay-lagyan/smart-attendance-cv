@@ -1,43 +1,232 @@
 {% extends "base.html" %}
 
-{% block title %}Welcome - Smart Attendance{% endblock %}
+{% block title %}Welcome — Smart Attendance{% endblock %}
 
 {% block content %}
-<div class="min-h-screen gradient-bg flex items-center justify-center px-4">
-    <div class="max-w-6xl w-full">
-        <div class="text-center text-white mb-12">
-            <h1 class="text-5xl md:text-6xl font-bold mb-4">Smart Attendance System</h1>
-            <p class="text-xl md:text-2xl opacity-90">AI-Powered Face Recognition Attendance</p>
+<!-- Page wrapper -->
+<section class="min-h-screen w-full bg-gradient-to-br from-purple-700 via-indigo-700 to-blue-600 text-white">
+  <div class="max-w-7xl mx-auto px-6 py-16 md:py-24 lg:py-28">
+    <!-- Header / Hero -->
+    <header class="flex flex-col-reverse md:flex-row items-center gap-10">
+      <!-- Left: copy -->
+      <div class="w-full md:w-1/2 text-center md:text-left">
+        <p class="inline-block text-sm uppercase tracking-wider bg-white/10 px-3 py-1 rounded-full mb-4">
+          Trusted by campuses & enterprises
+        </p>
+
+        <h1 class="text-4xl md:text-5.5xl lg:text-6xl font-extrabold leading-tight mb-4">
+          Smart Attendance System
+        </h1>
+        <p class="text-lg md:text-xl text-white/90 mb-6 max-w-2xl">
+          AI-powered face recognition that automates roll calls, prevents buddy-punching and surfaces attendance insights your team can act on — instantly.
+        </p>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
+          <a href="/login"
+             class="btn-primary inline-flex items-center justify-center px-6 py-3 rounded-xl font-semibold shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/60"
+             aria-label="Login to Smart Attendance">
+            Get Started
+            <svg class="ml-3 w-4 h-4 transform transition-transform group-hover:translate-x-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+          </a>
+
+          <a href="/register" class="inline-block bg-white text-purple-700 px-6 py-3 rounded-xl font-semibold shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white/40">
+            Sign Up
+          </a>
         </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            <div class="bg-white p-8 rounded-xl card-shadow">
-                <div class="text-4xl mb-4">🚀</div>
-                <h3 class="text-xl font-bold mb-2">Fast & Accurate</h3>
-                <p class="text-gray-600">Advanced AI face recognition technology</p>
+
+        <!-- Key stats -->
+        <ul class="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm md:text-base">
+          <li class="bg-white/6 p-3 rounded-lg">
+            <div class="font-bold text-2xl">99.7%</div>
+            <div class="opacity-80">Recognition accuracy</div>
+          </li>
+          <li class="bg-white/6 p-3 rounded-lg">
+            <div class="font-bold text-2xl">100k+</div>
+            <div class="opacity-80">Daily checks</div>
+          </li>
+          <li class="bg-white/6 p-3 rounded-lg">
+            <div class="font-bold text-2xl">Enterprise</div>
+            <div class="opacity-80">Security standard</div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Right: hero illustration / mockup -->
+      <div class="w-full md:w-1/2 flex items-center justify-center">
+        <!-- Simple SVG mockup — swap with your screenshot or mockup image -->
+        <div class="relative max-w-md w-full">
+          <div class="rounded-2xl bg-gradient-to-tr from-white/10 to-white/5 p-6 shadow-2xl backdrop-blur-sm">
+            <div class="flex items-center justify-between mb-4">
+              <div class="text-sm font-semibold">Attendance Live</div>
+              <div class="text-xs text-white/80">Updated now</div>
             </div>
-            
-            <div class="bg-white p-8 rounded-xl card-shadow">
-                <div class="text-4xl mb-4">🔒</div>
-                <h3 class="text-xl font-bold mb-2">Secure</h3>
-                <p class="text-gray-600">Enterprise-grade security</p>
+
+            <div class="bg-white/6 rounded-lg p-4">
+              <!-- small chart placeholder -->
+              <canvas id="heroChart" width="600" height="220" class="w-full h-40 block" aria-hidden="true"></canvas>
             </div>
-            
-            <div class="bg-white p-8 rounded-xl card-shadow">
-                <div class="text-4xl mb-4">📊</div>
-                <h3 class="text-xl font-bold mb-2">Analytics</h3>
-                <p class="text-gray-600">Real-time attendance insights</p>
+
+            <div class="mt-4 grid grid-cols-3 gap-3 text-xs text-white/80">
+              <div class="text-center">
+                <div class="font-bold">1,482</div>
+                <div>Present</div>
+              </div>
+              <div class="text-center">
+                <div class="font-bold">42</div>
+                <div>Late</div>
+              </div>
+              <div class="text-center">
+                <div class="font-bold">12</div>
+                <div>Absent</div>
+              </div>
             </div>
+          </div>
+          <!-- subtle decorative ring -->
+          <div class="absolute -right-6 -bottom-6 w-28 h-28 rounded-full border border-white/10"></div>
         </div>
-        
-        <div class="text-center">
-            <a href="/login" class="btn-primary text-white px-8 py-4 rounded-lg text-lg font-semibold inline-block">
-                Get Started
-            </a>
-            <a href="/register" class="bg-white text-purple-600 px-8 py-4 rounded-lg text-lg font-semibold inline-block ml-4">
-                Sign Up
-            </a>
+      </div>
+    </header>
+
+    <!-- Features -->
+    <section class="mt-14">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- card -->
+        <article class="bg-white text-slate-800 p-6 rounded-2xl shadow-md hover:shadow-lg transition-shadow" role="article" aria-labelledby="f1">
+          <div class="text-3xl mb-3" aria-hidden="true">🚀</div>
+          <h3 id="f1" class="font-semibold text-lg mb-2">Fast & Accurate</h3>
+          <p class="text-sm opacity-85">Low-latency recognition tailored for crowded entrances and large lecture halls.</p>
+        </article>
+
+        <article class="bg-white text-slate-800 p-6 rounded-2xl shadow-md hover:shadow-lg transition-shadow" role="article" aria-labelledby="f2">
+          <div class="text-3xl mb-3" aria-hidden="true">🔒</div>
+          <h3 id="f2" class="font-semibold text-lg mb-2">Enterprise Security</h3>
+          <p class="text-sm opacity-85">Encrypted storage, role-based access and audit logs built for compliance.</p>
+        </article>
+
+        <article class="bg-white text-slate-800 p-6 rounded-2xl shadow-md hover:shadow-lg transition-shadow" role="article" aria-labelledby="f3">
+          <div class="text-3xl mb-3" aria-hidden="true">📊</div>
+          <h3 id="f3" class="font-semibold text-lg mb-2">Real-time Analytics</h3>
+          <p class="text-sm opacity-85">Trend charts, late attendance alerts and exportable reports (CSV/PDF).</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Testimonials & trust -->
+    <section class="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div class="lg:col-span-2">
+        <div class="bg-white/6 p-6 rounded-2xl shadow-inner">
+          <h4 class="font-semibold mb-3">What our partners say</h4>
+          <div id="testimonial" class="space-y-4" aria-live="polite">
+            <blockquote class="text-sm leading-relaxed">
+              "Since adopting Smart Attendance our daily check-ins are automatic and accurate — saves hours every week."
+            </blockquote>
+            <div class="flex items-center gap-3">
+              <img src="/static/images/avatar-anna.jpg" alt="Anna Lopez — Campus Admin" class="w-10 h-10 rounded-full object-cover">
+              <div>
+                <div class="font-medium">Anna Lopez</div>
+                <div class="text-xs opacity-80">Campus Admin — Greenfield University</div>
+              </div>
+            </div>
+          </div>
         </div>
-    </div>
-</div>
+      </div>
+
+      <aside class="bg-white/6 p-6 rounded-2xl text-sm">
+        <div class="font-semibold mb-3">Trusted by</div>
+        <div class="flex flex-col gap-3">
+          <img src="/static/images/logo-company-1.svg" alt="Company logo 1" class="h-6 object-contain">
+          <img src="/static/images/logo-company-2.svg" alt="Company logo 2" class="h-6 object-contain">
+          <img src="/static/images/logo-company-3.svg" alt="Company logo 3" class="h-6 object-contain">
+        </div>
+      </aside>
+    </section>
+
+    <!-- Footer CTA -->
+    <footer class="mt-12 text-center">
+      <p class="mb-4 text-sm">Ready to reduce administrative overhead and improve punctuality?</p>
+      <a href="/register" class="inline-block bg-white text-purple-700 px-6 py-3 rounded-xl font-semibold shadow-md">Start Free Trial</a>
+    </footer>
+  </div>
+</section>
+
+<style>
+  .btn-primary { background: linear-gradient(90deg,#7c3aed,#4f46e5); color: white; }
+  /* .text-5.5xl { font-size: 3.25rem; line-height: 1.05;}  */
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<script>
+  (function(){
+    try {
+      const c = document.getElementById('heroChart');
+      if (c && c.getContext) {
+        const ctx = c.getContext('2d');
+        const d = [5,10,8,12,9,14,11,16,13,18];
+        const w = c.width, h = c.height;
+        ctx.clearRect(0,0,w,h);
+        ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        ctx.beginPath();
+        d.forEach((v,i)=> {
+          const x = (i/(d.length-1))*(w-40)+20;
+          const y = h - (v / 20) * (h-40) - 20;
+          if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+        });
+        ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // small dots
+        d.forEach((v,i)=> {
+          const x = (i/(d.length-1))*(w-40)+20;
+          const y = h - (v / 20) * (h-40) - 20;
+          ctx.beginPath();
+          ctx.fillStyle = 'rgba(255,255,255,0.95)';
+          ctx.arc(x,y,3.5,0,Math.PI*2);
+          ctx.fill();
+        });
+      }
+    } catch(e){ /* silent */ }
+
+    // Testimonials rotation (very small, accessible)
+    const tEl = document.getElementById('testimonial');
+    const testimonials = [
+      { quote: "Since adopting Smart Attendance our daily check-ins are automatic and accurate — saves hours every week.", name: "Anna Lopez", role: "Campus Admin — Greenfield University", avatar: "/static/images/avatar-anna.jpg" },
+      { quote: "We eliminated buddy-punching and gained real attendance visibility across sites.", name: "Ravi Patel", role: "Operations Lead — TechSolutions", avatar: "/static/images/avatar-ravi.jpg" },
+      { quote: "Simple to deploy and the analytics are a game-changer for our HR team.", name: "Leena Singh", role: "HR Manager — BrightSchools", avatar: "/static/images/avatar-leena.jpg" }
+    ];
+    let tIdx = 0;
+    function renderTestimonial(i){
+      if(!tEl) return;
+      const t = testimonials[i % testimonials.length];
+      tEl.innerHTML = `
+        <blockquote class="text-sm leading-relaxed">"${t.quote}"</blockquote>
+        <div class="flex items-center gap-3 mt-3">
+          <img src="${t.avatar}" alt="${t.name}" class="w-10 h-10 rounded-full object-cover">
+          <div>
+            <div class="font-medium">${t.name}</div>
+            <div class="text-xs opacity-80">${t.role}</div>
+          </div>
+        </div>
+      `;
+    }
+    // rotate every 6s, but respect reduced motion
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      renderTestimonial(0);
+    } else {
+      renderTestimonial(0);
+      setInterval(()=> { tIdx++; renderTestimonial(tIdx); }, 6000);
+    }
+
+    // keyboard shortcut: press "g" to go to login (dev convenience, unobtrusive)
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'g' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
+        window.location.href = '/login';
+      }
+    });
+  })();
+</script>
 {% endblock %}
