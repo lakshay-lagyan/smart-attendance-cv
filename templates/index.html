@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 
-{% block title %}Welcome — Smart Attendance{% endblock %}
+{% block title %}Smart Attendance System - AI-Powered Face Recognition Attendance{% endblock %}
+
+{% block extra_head %}
+<meta name="description" content="AI-powered smart attendance system with facial recognition technology. Automate attendance tracking, prevent buddy punching, and get real-time insights.">
+<meta name="keywords" content="smart attendance, face recognition, attendance system, AI attendance, automated attendance">
+<meta property="og:title" content="Smart Attendance System - AI-Powered Face Recognition">
+<meta property="og:description" content="Enterprise-grade attendance management with AI-powered facial recognition">
+<meta property="og:type" content="website">
+<link rel="canonical" href="{{ request.url }}">
+{% endblock %}
 
 {% block content %}
 <!-- Page wrapper -->
@@ -123,7 +132,9 @@
               "Since adopting Smart Attendance our daily check-ins are automatic and accurate — saves hours every week."
             </blockquote>
             <div class="flex items-center gap-3">
-              <img src="/static/images/avatar-anna.jpg" alt="Anna Lopez — Campus Admin" class="w-10 h-10 rounded-full object-cover">
+              <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                AL
+              </div>
               <div>
                 <div class="font-medium">Anna Lopez</div>
                 <div class="text-xs opacity-80">Campus Admin — Greenfield University</div>
@@ -136,9 +147,9 @@
       <aside class="bg-white/6 p-6 rounded-2xl text-sm">
         <div class="font-semibold mb-3">Trusted by</div>
         <div class="flex flex-col gap-3">
-          <img src="/static/images/logo-company-1.svg" alt="Company logo 1" class="h-6 object-contain">
-          <img src="/static/images/logo-company-2.svg" alt="Company logo 2" class="h-6 object-contain">
-          <img src="/static/images/logo-company-3.svg" alt="Company logo 3" class="h-6 object-contain">
+          <div class="h-6 flex items-center text-white/80">🎓 Educational Institutions</div>
+          <div class="h-6 flex items-center text-white/80">🏢 Corporate Offices</div>
+          <div class="h-6 flex items-center text-white/80">🏭 Manufacturing Units</div>
         </div>
       </aside>
     </section>
@@ -194,9 +205,9 @@
     // Testimonials rotation (very small, accessible)
     const tEl = document.getElementById('testimonial');
     const testimonials = [
-      { quote: "Since adopting Smart Attendance our daily check-ins are automatic and accurate — saves hours every week.", name: "Anna Lopez", role: "Campus Admin — Greenfield University", avatar: "/static/images/avatar-anna.jpg" },
-      { quote: "We eliminated buddy-punching and gained real attendance visibility across sites.", name: "Ravi Patel", role: "Operations Lead — TechSolutions", avatar: "/static/images/avatar-ravi.jpg" },
-      { quote: "Simple to deploy and the analytics are a game-changer for our HR team.", name: "Leena Singh", role: "HR Manager — BrightSchools", avatar: "/static/images/avatar-leena.jpg" }
+      { quote: "Since adopting Smart Attendance our daily check-ins are automatic and accurate — saves hours every week.", name: "Anna Lopez", role: "Campus Admin — Greenfield University", avatar: "AL" },
+      { quote: "We eliminated buddy-punching and gained real attendance visibility across sites.", name: "Ravi Patel", role: "Operations Lead — TechSolutions", avatar: "RP" },
+      { quote: "Simple to deploy and the analytics are a game-changer for our HR team.", name: "Leena Singh", role: "HR Manager — BrightSchools", avatar: "LS" }
     ];
     let tIdx = 0;
     function renderTestimonial(i){
@@ -205,7 +216,7 @@
       tEl.innerHTML = `
         <blockquote class="text-sm leading-relaxed">"${t.quote}"</blockquote>
         <div class="flex items-center gap-3 mt-3">
-          <img src="${t.avatar}" alt="${t.name}" class="w-10 h-10 rounded-full object-cover">
+          <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">${t.avatar}</div>
           <div>
             <div class="font-medium">${t.name}</div>
             <div class="text-xs opacity-80">${t.role}</div>

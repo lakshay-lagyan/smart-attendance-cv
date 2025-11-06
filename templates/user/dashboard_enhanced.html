@@ -30,6 +30,9 @@
 {% endblock %}
 
 {% block content %}
+<!-- Mobile Overlay -->
+<div id="sidebarOverlay" class="sidebar-overlay"></div>
+
 <div class="flex h-screen bg-gray-50">
     <!-- Sidebar with Toggle -->
     <div id="sidebar" class="sidebar fixed md:static w-64 bg-gradient-to-b from-blue-600 to-blue-900 text-white h-full z-50 overflow-y-auto">
@@ -260,20 +263,28 @@ let loginTimeChart, punctualityChart;
 document.addEventListener('DOMContentLoaded', () => {
     const sidebar = document.getElementById('sidebar');
     const menuToggle = document.getElementById('menuToggle');
+    const overlay = document.getElementById('sidebarOverlay');
     
-    // Toggle sidebar on mobile
-    menuToggle.addEventListener('click', () => {
+    function toggleSidebar() {
         sidebar.classList.toggle('hidden-mobile');
-    });
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+    }
     
-    // Close sidebar when clicking outside on mobile
-    document.addEventListener('click', (e) => {
-        if (window.innerWidth < 768) {
-            if (!sidebar.contains(e.target) && !menuToggle.contains(e.target)) {
+    menuToggle.addEventListener('click', toggleSidebar);
+    overlay.addEventListener('click', toggleSidebar);
+    
+    // Close sidebar when clicking on a link (mobile only)
+    if (window.innerWidth <= 768) {
+        const sidebarLinks = sidebar.querySelectorAll('a');
+        sidebarLinks.forEach(link => {
+            link.addEventListener('click', () => {
                 sidebar.classList.add('hidden-mobile');
-            }
-        }
-    });
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+            });
+        });
+    }
     
     loadUserInfo();
     loadUserStats();
