@@ -100,7 +100,7 @@
             <div>
                 <label class="block font-semibold mb-2">Password</label>
                 <input type="password" id="adminPassword" class="w-full px-4 py-2 border rounded-lg">
-                <p class="text-sm text-gray-500 mt-1">Leave blank to keep current password</p>
+                <p id="passwordHint" class="text-sm text-gray-500 mt-1">Required for new admin</p>
             </div>
             <button type="submit" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
                 Save Admin
@@ -173,6 +173,8 @@ function showCreateModal() {
     document.getElementById('modalTitle').textContent = 'Add Admin';
     document.getElementById('adminForm').reset();
     document.getElementById('adminId').value = '';
+    document.getElementById('adminPassword').required = true;
+    document.getElementById('passwordHint').textContent = 'Required for new admin';
     document.getElementById('adminModal').classList.add('active');
 }
 
@@ -186,6 +188,8 @@ function editAdmin(id) {
     document.getElementById('adminEmail').value = admin.email;
     document.getElementById('adminDept').value = admin.department || '';
     document.getElementById('adminPassword').value = '';
+    document.getElementById('adminPassword').required = false;
+    document.getElementById('passwordHint').textContent = 'Leave blank to keep current password';
     document.getElementById('adminModal').classList.add('active');
 }
 
@@ -197,12 +201,24 @@ async function saveAdmin(e) {
     e.preventDefault();
     
     const id = document.getElementById('adminId').value;
+    const password = document.getElementById('adminPassword').value;
+    
+    // Validate password for new admin
+    if (!id && !password) {
+        showToast('Password is required for new admin', 'error');
+        return;
+    }
+    
     const data = {
         name: document.getElementById('adminName').value,
         email: document.getElementById('adminEmail').value,
-        department: document.getElementById('adminDept').value,
-        password: document.getElementById('adminPassword').value
+        department: document.getElementById('adminDept').value
     };
+    
+    // Only include password if it's provided
+    if (password) {
+        data.password = password;
+    }
     
     try {
         const url = id ? `/superadmin/admins/${id}` : '/superadmin/admins';

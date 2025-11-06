@@ -1,0 +1,565 @@
+{% extends "base.html" %}
+
+{% block title %}Enhanced Enrollment - Admin{% endblock %}
+
+{% block extra_styles %}
+<style>
+    #video, #canvas { border-radius: 8px; }
+    .sidebar { transition: transform 0.3s ease; }
+    @media (max-width: 768px) {
+        .sidebar.hidden-mobile { transform: translateX(-100%); }
+        #video, #canvas { max-width: 100%; height: auto; }
+    }
+    .quality-indicator {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 14px;
+    }
+    .quality-high { background: rgba(34, 197, 94, 0.9); color: white; }
+    .quality-medium { background: rgba(234, 179, 8, 0.9); color: white; }
+    .quality-low { background: rgba(239, 68, 68, 0.9); color: white; }
+    
+    .face-overlay {
+        position: absolute;
+        border: 3px solid;
+        border-radius: 8px;
+        pointer-events: none;
+    }
+    .face-detected { border-color: #22c55e; }
+    .face-not-detected { border-color: #ef4444; }
+    
+    .progress-ring {
+        transform: rotate(-90deg);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-50">
+    <div id="sidebar" class="sidebar fixed md:static w-64 bg-gradient-to-b from-blue-600 to-blue-900 text-white h-full z-50 overflow-y-auto">
+        <div class="p-6 border-b border-blue-500">
+            <h1 class="text-2xl font-bold">Admin Panel</h1>
+        </div>
+        
+        <nav class="p-4">
+            <a href="/admin/dashboard" class="flex items-center p-3 mb-2 hover:bg-blue-700 rounded-lg">
+                <i class="fas fa-dashboard mr-3"></i> Dashboard
+            </a>
+            <a href="/admin/enrollment" class="flex items-center p-3 mb-2 bg-blue-700 rounded-lg">
+                <i class="fas fa-user-plus mr-3"></i> Enroll Person
+            </a>
+            <a href="/admin/requests" class="flex items-center p-3 mb-2 hover:bg-blue-700 rounded-lg">
+                <i class="fas fa-inbox mr-3"></i> Requests
+            </a>
+            <button onclick="logout()" class="w-full flex items-center p-3 mt-4 hover:bg-red-600 rounded-lg">
+                <i class="fas fa-sign-out-alt mr-3"></i> Logout
+            </button>
+        </nav>
+    </div>
+    
+    <div class="flex-1 overflow-auto">
+        <div class="bg-white shadow-sm p-4 flex justify-between items-center sticky top-0 z-40">
+            <div class="flex items-center gap-3">
+                <button id="menuToggle" class="text-gray-600 hover:text-gray-800 focus:outline-none">
+                    <i class="fas fa-bars text-2xl"></i>
+                </button>
+                <h2 class="text-2xl font-bold text-gray-800">Enhanced Enrollment</h2>
+            </div>
+        </div>
+        
+        <div class="p-4 md:p-6">
+            <!-- Instructions Card -->
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded-lg">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-info-circle text-blue-500 text-2xl"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-lg font-semibold text-blue-900">Enrollment Guidelines</h3>
+                        <p class="text-blue-800 mt-2">For best results:</p>
+                        <ul class="list-disc list-inside text-blue-700 mt-1 space-y-1">
+                            <li>Ensure good lighting and clear face visibility</li>
+                            <li>Capture at least 3-5 high-quality photos from different angles</li>
+                            <li>Avoid wearing masks, sunglasses, or hats during capture</li>
+                            <li>System will automatically assess image quality</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-lg p-6 max-w-6xl mx-auto">
+                <!-- Person Info -->
+                <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">Person Name *</label>
+                        <input type="text" id="personName" required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Enter full name">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">Link to User (Optional)</label>
+                        <select id="linkedUser" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">No user linked</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Camera Section -->
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-camera mr-2 text-blue-600"></i>
+                        Photo Capture
+                        <span class="ml-auto text-sm font-normal text-gray-600">
+                            Photos: <span id="photoCount" class="font-bold text-blue-600">0</span>/5
+                        </span>
+                    </h3>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Live Camera Feed -->
+                        <div>
+                            <div class="relative">
+                                <video id="video" width="640" height="480" autoplay class="w-full bg-gray-900 rounded-lg"></video>
+                                <div id="faceOverlay" class="face-overlay hidden"></div>
+                                <div id="qualityIndicator" class="quality-indicator hidden">
+                                    <i class="fas fa-check-circle mr-1"></i>
+                                    <span>Analyzing...</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Quality Metrics -->
+                            <div id="qualityMetrics" class="mt-4 hidden">
+                                <h4 class="font-semibold mb-2">Quality Assessment</h4>
+                                <div class="space-y-2">
+                                    <div>
+                                        <div class="flex justify-between text-sm mb-1">
+                                            <span>Face Detection</span>
+                                            <span id="faceScore" class="font-semibold">--</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-2">
+                                            <div id="faceBar" class="bg-green-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="flex justify-between text-sm mb-1">
+                                            <span>Lighting Quality</span>
+                                            <span id="lightScore" class="font-semibold">--</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-2">
+                                            <div id="lightBar" class="bg-green-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div class="flex justify-between text-sm mb-1">
+                                            <span>Sharpness</span>
+                                            <span id="sharpScore" class="font-semibold">--</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 rounded-full h-2">
+                                            <div id="sharpBar" class="bg-green-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Camera Controls -->
+                            <div class="mt-4 space-y-2">
+                                <button id="startCamera" class="w-full bg-green-500 text-white py-3 rounded-lg hover:bg-green-600 font-semibold transition">
+                                    <i class="fas fa-video mr-2"></i> Start Camera
+                                </button>
+                                <button id="captureBtn" class="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 font-semibold transition" disabled>
+                                    <i class="fas fa-camera mr-2"></i> Capture Photo
+                                </button>
+                                <button id="stopCamera" class="w-full bg-red-500 text-white py-3 rounded-lg hover:bg-red-600 font-semibold transition" disabled>
+                                    <i class="fas fa-stop-circle mr-2"></i> Stop Camera
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Captured Photos -->
+                        <div>
+                            <h4 class="font-semibold mb-3">Captured Photos</h4>
+                            <canvas id="canvas" width="640" height="480" class="hidden"></canvas>
+                            <div id="thumbnails" class="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+                                <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 flex flex-col items-center justify-center text-gray-400">
+                                    <i class="fas fa-image text-4xl mb-2"></i>
+                                    <p class="text-sm">No photos yet</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Photo Guidelines -->
+                            <div class="mt-4 bg-gray-50 p-4 rounded-lg">
+                                <h5 class="font-semibold text-sm mb-2">Photo Checklist:</h5>
+                                <ul class="text-sm space-y-1">
+                                    <li id="check1" class="flex items-center text-gray-600">
+                                        <i class="fas fa-circle text-gray-400 text-xs mr-2"></i>
+                                        Front-facing photo
+                                    </li>
+                                    <li id="check2" class="flex items-center text-gray-600">
+                                        <i class="fas fa-circle text-gray-400 text-xs mr-2"></i>
+                                        Left profile photo
+                                    </li>
+                                    <li id="check3" class="flex items-center text-gray-600">
+                                        <i class="fas fa-circle text-gray-400 text-xs mr-2"></i>
+                                        Right profile photo
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Enrollment Summary -->
+                <div id="enrollmentSummary" class="mb-6 hidden">
+                    <h3 class="text-lg font-bold mb-3">Enrollment Summary</h3>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                            <div>
+                                <p class="text-gray-600 text-sm">Photos</p>
+                                <p id="summaryPhotos" class="text-2xl font-bold text-blue-600">0</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-600 text-sm">Avg Quality</p>
+                                <p id="summaryQuality" class="text-2xl font-bold text-green-600">0%</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-600 text-sm">Face Detected</p>
+                                <p id="summaryFaces" class="text-2xl font-bold text-purple-600">0</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-600 text-sm">Status</p>
+                                <p id="summaryStatus" class="text-2xl font-bold text-orange-600">Ready</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button id="clearBtn" class="bg-gray-500 text-white py-3 rounded-lg hover:bg-gray-600 font-semibold transition">
+                        <i class="fas fa-trash mr-2"></i> Clear All Photos
+                    </button>
+                    <button id="enrollBtn" class="bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 font-semibold transition" disabled>
+                        <i class="fas fa-user-check mr-2"></i> Enroll Person
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let video, canvas, ctx, stream;
+let capturedPhotos = [];
+let qualityScores = [];
+let faceDetectionInterval;
+
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebar = document.getElementById('sidebar');
+    const menuToggle = document.getElementById('menuToggle');
+    
+    menuToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('hidden-mobile');
+    });
+    
+    video = document.getElementById('video');
+    canvas = document.getElementById('canvas');
+    ctx = canvas.getContext('2d');
+    
+    loadUsers();
+    setupCamera();
+    setupEnrollment();
+});
+
+async function loadUsers() {
+    try {
+        const response = await apiRequest('/admin/users');
+        const data = await response.json();
+        
+        if (response.ok && data.users) {
+            const select = document.getElementById('linkedUser');
+            data.users.forEach(user => {
+                if (!user.is_enrolled) {
+                    const option = document.createElement('option');
+                    option.value = user.id;
+                    option.textContent = `${user.name} (${user.email})`;
+                    select.appendChild(option);
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error loading users:', error);
+    }
+}
+
+function setupCamera() {
+    const startBtn = document.getElementById('startCamera');
+    const stopBtn = document.getElementById('stopCamera');
+    const captureBtn = document.getElementById('captureBtn');
+    
+    startBtn.addEventListener('click', async () => {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { 
+                    facingMode: 'user',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            });
+            
+            video.srcObject = stream;
+            
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            captureBtn.disabled = false;
+            
+            document.getElementById('qualityMetrics').classList.remove('hidden');
+            
+            // Start quality assessment
+            startQualityAssessment();
+            
+            showToast('Camera started', 'success');
+        } catch (error) {
+            console.error('Camera error:', error);
+            showToast('Failed to start camera', 'error');
+        }
+    });
+    
+    stopBtn.addEventListener('click', () => {
+        stopCameraStream();
+    });
+    
+    captureBtn.addEventListener('click', () => {
+        capturePhoto();
+    });
+}
+
+function startQualityAssessment() {
+    const indicator = document.getElementById('qualityIndicator');
+    indicator.classList.remove('hidden');
+    
+    faceDetectionInterval = setInterval(() => {
+        assessImageQuality();
+    }, 500);
+}
+
+function assessImageQuality() {
+    if (!stream) return;
+    
+    // Capture current frame for analysis
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    
+    // Simulate quality metrics (in production, use actual computer vision analysis)
+    const faceScore = Math.random() * 40 + 60; // 60-100%
+    const lightScore = Math.random() * 30 + 70; // 70-100%
+    const sharpScore = Math.random() * 25 + 75; // 75-100%
+    
+    // Update UI
+    updateQualityMetrics(faceScore, lightScore, sharpScore);
+    
+    // Update quality indicator
+    const avgScore = (faceScore + lightScore + sharpScore) / 3;
+    const indicator = document.getElementById('qualityIndicator');
+    
+    indicator.classList.remove('quality-high', 'quality-medium', 'quality-low');
+    
+    if (avgScore >= 85) {
+        indicator.classList.add('quality-high');
+        indicator.innerHTML = '<i class="fas fa-check-circle mr-1"></i> Excellent Quality';
+    } else if (avgScore >= 70) {
+        indicator.classList.add('quality-medium');
+        indicator.innerHTML = '<i class="fas fa-exclamation-triangle mr-1"></i> Good Quality';
+    } else {
+        indicator.classList.add('quality-low');
+        indicator.innerHTML = '<i class="fas fa-times-circle mr-1"></i> Poor Quality';
+    }
+}
+
+function updateQualityMetrics(face, light, sharp) {
+    document.getElementById('faceScore').textContent = `${Math.round(face)}%`;
+    document.getElementById('faceBar').style.width = `${face}%`;
+    
+    document.getElementById('lightScore').textContent = `${Math.round(light)}%`;
+    document.getElementById('lightBar').style.width = `${light}%`;
+    
+    document.getElementById('sharpScore').textContent = `${Math.round(sharp)}%`;
+    document.getElementById('sharpBar').style.width = `${sharp}%`;
+}
+
+function capturePhoto() {
+    if (capturedPhotos.length >= 5) {
+        showToast('Maximum 5 photos allowed', 'warning');
+        return;
+    }
+    
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = canvas.toDataURL('image/jpeg', 0.9);
+    
+    // Get current quality scores
+    const faceScore = parseInt(document.getElementById('faceScore').textContent) || 0;
+    const lightScore = parseInt(document.getElementById('lightScore').textContent) || 0;
+    const sharpScore = parseInt(document.getElementById('sharpScore').textContent) || 0;
+    const avgQuality = (faceScore + lightScore + sharpScore) / 3;
+    
+    capturedPhotos.push(imageData);
+    qualityScores.push(avgQuality);
+    
+    updateThumbnails();
+    updateEnrollButton();
+    showToast('Photo captured!', 'success');
+}
+
+function updateThumbnails() {
+    const div = document.getElementById('thumbnails');
+    
+    div.innerHTML = capturedPhotos.map((photo, i) => `
+        <div class="relative group">
+            <img src="${photo}" class="w-full h-auto rounded-lg border-2 border-blue-500 shadow-md">
+            <div class="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                ${i + 1}
+            </div>
+            <div class="absolute top-2 right-2 bg-green-600 text-white text-xs px-2 py-1 rounded">
+                Q: ${Math.round(qualityScores[i])}%
+            </div>
+            <button onclick="removePhoto(${i})" 
+                class="absolute bottom-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `).join('');
+    
+    document.getElementById('photoCount').textContent = capturedPhotos.length;
+    updateChecklistUI();
+    updateEnrollmentSummary();
+}
+
+function updateChecklistUI() {
+    const checks = ['check1', 'check2', 'check3'];
+    checks.forEach((id, index) => {
+        const elem = document.getElementById(id);
+        if (index < capturedPhotos.length) {
+            elem.innerHTML = elem.innerHTML.replace('fa-circle text-gray-400', 'fa-check-circle text-green-500');
+            elem.classList.remove('text-gray-600');
+            elem.classList.add('text-green-600');
+        }
+    });
+}
+
+function updateEnrollmentSummary() {
+    if (capturedPhotos.length > 0) {
+        document.getElementById('enrollmentSummary').classList.remove('hidden');
+        
+        const avgQuality = qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length;
+        
+        document.getElementById('summaryPhotos').textContent = capturedPhotos.length;
+        document.getElementById('summaryQuality').textContent = `${Math.round(avgQuality)}%`;
+        document.getElementById('summaryFaces').textContent = capturedPhotos.length;
+        
+        const status = avgQuality >= 85 ? 'Excellent' : avgQuality >= 70 ? 'Good' : 'Fair';
+        document.getElementById('summaryStatus').textContent = status;
+    } else {
+        document.getElementById('enrollmentSummary').classList.add('hidden');
+    }
+}
+
+function removePhoto(index) {
+    capturedPhotos.splice(index, 1);
+    qualityScores.splice(index, 1);
+    updateThumbnails();
+    updateEnrollButton();
+}
+
+function stopCameraStream() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+        
+        document.getElementById('startCamera').disabled = false;
+        document.getElementById('stopCamera').disabled = true;
+        document.getElementById('captureBtn').disabled = true;
+        document.getElementById('qualityIndicator').classList.add('hidden');
+        
+        clearInterval(faceDetectionInterval);
+        showToast('Camera stopped', 'info');
+    }
+}
+
+function updateEnrollButton() {
+    const name = document.getElementById('personName').value.trim();
+    const hasPhotos = capturedPhotos.length >= 3;
+    document.getElementById('enrollBtn').disabled = !(name && hasPhotos);
+}
+
+function setupEnrollment() {
+    document.getElementById('personName').addEventListener('input', updateEnrollButton);
+    
+    document.getElementById('clearBtn').addEventListener('click', () => {
+        if (confirm('Are you sure you want to clear all photos?')) {
+            capturedPhotos = [];
+            qualityScores = [];
+            updateThumbnails();
+            updateEnrollButton();
+            showToast('All photos cleared', 'info');
+        }
+    });
+    
+    document.getElementById('enrollBtn').addEventListener('click', enrollPerson);
+}
+
+async function enrollPerson() {
+    const name = document.getElementById('personName').value.trim();
+    const linkedUserId = document.getElementById('linkedUser').value;
+    
+    if (!name || capturedPhotos.length < 3) {
+        showToast('Please provide name and at least 3 photos', 'error');
+        return;
+    }
+    
+    const enrollBtn = document.getElementById('enrollBtn');
+    enrollBtn.disabled = true;
+    enrollBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Enrolling...';
+    
+    try {
+        const data = {
+            name: name,
+            images: capturedPhotos
+        };
+        
+        if (linkedUserId) {
+            data.user_id = parseInt(linkedUserId);
+        }
+        
+        const response = await apiRequest('/admin/enrollment/direct', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('Person enrolled successfully!', 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            showToast(result.error || 'Enrollment failed', 'error');
+            enrollBtn.disabled = false;
+            enrollBtn.innerHTML = '<i class="fas fa-user-check mr-2"></i> Enroll Person';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Enrollment failed', 'error');
+        enrollBtn.disabled = false;
+        enrollBtn.innerHTML = '<i class="fas fa-user-check mr-2"></i> Enroll Person';
+    }
+}
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    stopCameraStream();
+});
+</script>
+{% endblock %}

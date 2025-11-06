@@ -1,0 +1,645 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Requests - Admin{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .sidebar { transition: transform 0.3s ease; }
+    @media (max-width: 768px) {
+        .sidebar.hidden-mobile { transform: translateX(-100%); }
+    }
+    .modal { display: none; }
+    .modal.active { display: flex; }
+    .tab-button.active {
+        border-bottom: 3px solid #3b82f6;
+        color: #3b82f6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-50">
+    <div id="sidebar" class="sidebar fixed md:static w-64 bg-gradient-to-b from-blue-600 to-blue-900 text-white h-full z-50 overflow-y-auto">
+        <div class="p-6 border-b border-blue-500">
+            <h1 class="text-2xl font-bold">Admin Panel</h1>
+        </div>
+        
+        <nav class="p-4">
+            <a href="/admin/dashboard" class="flex items-center p-3 mb-2 hover:bg-blue-700 rounded-lg">
+                <i class="fas fa-dashboard mr-3"></i> Dashboard
+            </a>
+            <a href="/admin/enrollment" class="flex items-center p-3 mb-2 hover:bg-blue-700 rounded-lg">
+                <i class="fas fa-user-plus mr-3"></i> Enroll Person
+            </a>
+            <a href="/admin/requests" class="flex items-center p-3 mb-2 bg-blue-700 rounded-lg">
+                <i class="fas fa-inbox mr-3"></i> Requests
+                <span id="totalPending" class="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full">0</span>
+            </a>
+            <button onclick="logout()" class="w-full flex items-center p-3 mt-4 hover:bg-red-600 rounded-lg">
+                <i class="fas fa-sign-out-alt mr-3"></i> Logout
+            </button>
+        </nav>
+    </div>
+    
+    <div class="flex-1 overflow-auto">
+        <div class="bg-white shadow-sm p-4 flex justify-between items-center sticky top-0 z-40">
+            <div class="flex items-center gap-3">
+                <button id="menuToggle" class="text-gray-600 hover:text-gray-800 focus:outline-none">
+                    <i class="fas fa-bars text-2xl"></i>
+                </button>
+                <h2 class="text-2xl font-bold text-gray-800">Manage Requests</h2>
+            </div>
+        </div>
+        
+        <div class="p-4 md:p-6">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Signup Requests</p>
+                            <p id="signupCount" class="text-3xl font-bold text-blue-600">0</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <i class="fas fa-user-plus text-2xl text-blue-600"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Enrollment Requests</p>
+                            <p id="enrollmentCount" class="text-3xl font-bold text-green-600">0</p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <i class="fas fa-id-card text-2xl text-green-600"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm">Leave Requests</p>
+                            <p id="leaveCount" class="text-3xl font-bold text-purple-600">0</p>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <i class="fas fa-calendar-alt text-2xl text-purple-600"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabs -->
+            <div class="bg-white rounded-lg shadow-lg">
+                <div class="border-b">
+                    <nav class="flex space-x-4 px-6">
+                        <button onclick="switchTab('signup')" id="tabSignup" class="tab-button active py-4 px-2 font-semibold focus:outline-none">
+                            Signup Requests
+                        </button>
+                        <button onclick="switchTab('enrollment')" id="tabEnrollment" class="tab-button py-4 px-2 font-semibold focus:outline-none text-gray-600">
+                            Enrollment Requests
+                        </button>
+                        <button onclick="switchTab('leave')" id="tabLeave" class="tab-button py-4 px-2 font-semibold focus:outline-none text-gray-600">
+                            Leave Requests
+                        </button>
+                    </nav>
+                </div>
+                
+                <!-- Signup Requests Tab -->
+                <div id="signupTab" class="p-6">
+                    <div id="signupList" class="space-y-4">
+                        <div class="p-8 text-center text-gray-500">Loading...</div>
+                    </div>
+                </div>
+                
+                <!-- Enrollment Requests Tab -->
+                <div id="enrollmentTab" class="p-6 hidden">
+                    <div id="enrollmentList" class="space-y-4">
+                        <div class="p-8 text-center text-gray-500">Loading...</div>
+                    </div>
+                </div>
+                
+                <!-- Leave Requests Tab -->
+                <div id="leaveTab" class="p-6 hidden">
+                    <div id="leaveList" class="space-y-4">
+                        <div class="p-8 text-center text-gray-500">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Signup Request Modal -->
+<div id="signupModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg max-w-2xl w-full max-h-screen overflow-y-auto">
+        <div class="p-6 border-b flex justify-between items-center">
+            <h3 class="text-2xl font-bold">Signup Request Details</h3>
+            <button onclick="closeModals()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        <div id="signupModalContent" class="p-6"></div>
+    </div>
+</div>
+
+<!-- Enrollment Request Modal -->
+<div id="enrollmentModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-y-auto">
+        <div class="p-6 border-b flex justify-between items-center">
+            <h3 class="text-2xl font-bold">Enrollment Request Details</h3>
+            <button onclick="closeModals()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        <div id="enrollmentModalContent" class="p-6"></div>
+    </div>
+</div>
+
+<!-- Leave Request Modal -->
+<div id="leaveModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg max-w-2xl w-full">
+        <div class="p-6 border-b flex justify-between items-center">
+            <h3 class="text-2xl font-bold">Leave Request Details</h3>
+            <button onclick="closeModals()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        <div id="leaveModalContent" class="p-6"></div>
+    </div>
+</div>
+
+<script>
+let signupRequests = [];
+let enrollmentRequests = [];
+let leaveRequests = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebar = document.getElementById('sidebar');
+    const menuToggle = document.getElementById('menuToggle');
+    
+    menuToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('hidden-mobile');
+    });
+    
+    loadAllRequests();
+});
+
+async function loadAllRequests() {
+    await loadSignupRequests();
+    await loadEnrollmentRequests();
+    await loadLeaveRequests();
+    updateStats();
+}
+
+async function loadSignupRequests() {
+    try {
+        const response = await apiRequest('/admin/signup/requests?status=pending');
+        const data = await response.json();
+        
+        if (response.ok) {
+            signupRequests = data.requests || [];
+            displaySignupRequests();
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+async function loadEnrollmentRequests() {
+    try {
+        const response = await apiRequest('/admin/enrollment/requests?status=pending');
+        const data = await response.json();
+        
+        if (response.ok) {
+            enrollmentRequests = data.requests || [];
+            displayEnrollmentRequests();
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+async function loadLeaveRequests() {
+    try {
+        const response = await apiRequest('/admin/leave/requests?status=pending');
+        const data = await response.json();
+        
+        if (response.ok) {
+            leaveRequests = data.requests || [];
+            displayLeaveRequests();
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+function updateStats() {
+    document.getElementById('signupCount').textContent = signupRequests.length;
+    document.getElementById('enrollmentCount').textContent = enrollmentRequests.length;
+    document.getElementById('leaveCount').textContent = leaveRequests.length;
+    document.getElementById('totalPending').textContent = signupRequests.length + enrollmentRequests.length + leaveRequests.length;
+}
+
+function displaySignupRequests() {
+    const listDiv = document.getElementById('signupList');
+    
+    if (signupRequests.length === 0) {
+        listDiv.innerHTML = '<div class="p-8 text-center text-gray-500">No pending signup requests</div>';
+        return;
+    }
+    
+    listDiv.innerHTML = signupRequests.map(req => `
+        <div class="border rounded-lg p-4 hover:shadow-md transition">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                <div class="mb-3 md:mb-0">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-user text-blue-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-lg font-bold">${req.name}</h4>
+                            <p class="text-gray-600 text-sm">${req.email}</p>
+                            <p class="text-gray-500 text-xs">Phone: ${req.phone || 'N/A'} • Dept: ${req.department || 'N/A'}</p>
+                            <p class="text-gray-400 text-xs mt-1">Submitted: ${new Date(req.submitted_at).toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="viewSignupRequest(${req.id})" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                        <i class="fas fa-eye mr-2"></i> View
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function displayEnrollmentRequests() {
+    const listDiv = document.getElementById('enrollmentList');
+    
+    if (enrollmentRequests.length === 0) {
+        listDiv.innerHTML = '<div class="p-8 text-center text-gray-500">No pending enrollment requests</div>';
+        return;
+    }
+    
+    listDiv.innerHTML = enrollmentRequests.map(req => `
+        <div class="border rounded-lg p-4 hover:shadow-md transition">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                <div class="mb-3 md:mb-0">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-id-card text-green-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-lg font-bold">${req.name}</h4>
+                            <p class="text-gray-600 text-sm">${req.email}</p>
+                            <p class="text-gray-500 text-xs">${req.images ? req.images.length : 0} photos submitted</p>
+                            <p class="text-gray-400 text-xs mt-1">Submitted: ${new Date(req.submitted_at).toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="viewEnrollmentRequest(${req.id})" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">
+                        <i class="fas fa-eye mr-2"></i> View
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function displayLeaveRequests() {
+    const listDiv = document.getElementById('leaveList');
+    
+    if (leaveRequests.length === 0) {
+        listDiv.innerHTML = '<div class="p-8 text-center text-gray-500">No pending leave requests</div>';
+        return;
+    }
+    
+    listDiv.innerHTML = leaveRequests.map(req => `
+        <div class="border rounded-lg p-4 hover:shadow-md transition">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                <div class="mb-3 md:mb-0">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-calendar-alt text-purple-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-lg font-bold">${req.user_name || 'User'}</h4>
+                            <p class="text-gray-600 text-sm capitalize">${req.leave_type} Leave</p>
+                            <p class="text-gray-500 text-xs">${new Date(req.start_date).toLocaleDateString()} - ${new Date(req.end_date).toLocaleDateString()}</p>
+                            <p class="text-gray-400 text-xs mt-1">Submitted: ${new Date(req.submitted_at).toLocaleString()}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="viewLeaveRequest(${req.id})" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600">
+                        <i class="fas fa-eye mr-2"></i> View
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function switchTab(tab) {
+    // Hide all tabs
+    document.getElementById('signupTab').classList.add('hidden');
+    document.getElementById('enrollmentTab').classList.add('hidden');
+    document.getElementById('leaveTab').classList.add('hidden');
+    
+    // Remove active class from all buttons
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+        btn.classList.add('text-gray-600');
+    });
+    
+    // Show selected tab
+    if (tab === 'signup') {
+        document.getElementById('signupTab').classList.remove('hidden');
+        document.getElementById('tabSignup').classList.add('active');
+        document.getElementById('tabSignup').classList.remove('text-gray-600');
+    } else if (tab === 'enrollment') {
+        document.getElementById('enrollmentTab').classList.remove('hidden');
+        document.getElementById('tabEnrollment').classList.add('active');
+        document.getElementById('tabEnrollment').classList.remove('text-gray-600');
+    } else if (tab === 'leave') {
+        document.getElementById('leaveTab').classList.remove('hidden');
+        document.getElementById('tabLeave').classList.add('active');
+        document.getElementById('tabLeave').classList.remove('text-gray-600');
+    }
+}
+
+function viewSignupRequest(id) {
+    const req = signupRequests.find(r => r.id === id);
+    if (!req) return;
+    
+    const content = document.getElementById('signupModalContent');
+    content.innerHTML = `
+        <div class="space-y-4">
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h4 class="font-semibold mb-3">Personal Information</h4>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div><span class="text-gray-600">Name:</span> <span class="font-medium">${req.name}</span></div>
+                    <div><span class="text-gray-600">Email:</span> <span class="font-medium">${req.email}</span></div>
+                    <div><span class="text-gray-600">Phone:</span> <span class="font-medium">${req.phone || 'N/A'}</span></div>
+                    <div><span class="text-gray-600">Department:</span> <span class="font-medium">${req.department || 'N/A'}</span></div>
+                </div>
+            </div>
+            
+            ${req.profile_image ? `
+                <div>
+                    <h4 class="font-semibold mb-2">Profile Photo</h4>
+                    <img src="${req.profile_image}" class="w-48 h-48 object-cover rounded-lg border">
+                </div>
+            ` : ''}
+            
+            ${req.documents && req.documents.length > 0 ? `
+                <div>
+                    <h4 class="font-semibold mb-2">Submitted Documents</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        ${req.documents.map((doc, i) => `
+                            <div class="border rounded-lg p-2">
+                                <img src="${doc}" class="w-full h-auto rounded">
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            
+            <div class="flex space-x-3 pt-4 border-t">
+                <button onclick="approveSignup(${req.id})" class="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold">
+                    <i class="fas fa-check mr-2"></i> Approve
+                </button>
+                <button onclick="showRejectForm('signup', ${req.id})" class="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 font-semibold">
+                    <i class="fas fa-times mr-2"></i> Reject
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('signupModal').classList.add('active');
+}
+
+function viewEnrollmentRequest(id) {
+    const req = enrollmentRequests.find(r => r.id === id);
+    if (!req) return;
+    
+    const content = document.getElementById('enrollmentModalContent');
+    content.innerHTML = `
+        <div class="space-y-4">
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <h4 class="font-semibold mb-3">User Information</h4>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div><span class="text-gray-600">Name:</span> <span class="font-medium">${req.name}</span></div>
+                    <div><span class="text-gray-600">Email:</span> <span class="font-medium">${req.email}</span></div>
+                    <div><span class="text-gray-600">Phone:</span> <span class="font-medium">${req.phone || 'N/A'}</span></div>
+                    <div><span class="text-gray-600">Photos:</span> <span class="font-medium">${req.images ? req.images.length : 0}</span></div>
+                </div>
+            </div>
+            
+            <div>
+                <h4 class="font-semibold mb-3">Submitted Photos</h4>
+                <div class="grid grid-cols-3 gap-3">
+                    ${(req.images || []).map((img, i) => `
+                        <div class="relative group">
+                            <img src="${img}" class="w-full h-auto rounded-lg border-2 border-gray-300">
+                            <div class="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-1 rounded">${i + 1}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <div class="flex space-x-3 pt-4 border-t">
+                <button onclick="approveEnrollment(${req.id})" class="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold">
+                    <i class="fas fa-check mr-2"></i> Approve Enrollment
+                </button>
+                <button onclick="showRejectForm('enrollment', ${req.id})" class="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 font-semibold">
+                    <i class="fas fa-times mr-2"></i> Reject
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('enrollmentModal').classList.add('active');
+}
+
+function viewLeaveRequest(id) {
+    const req = leaveRequests.find(r => r.id === id);
+    if (!req) return;
+    
+    const content = document.getElementById('leaveModalContent');
+    content.innerHTML = `
+        <div class="space-y-4">
+            <div class="bg-gray-50 p-4 rounded-lg">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><span class="text-gray-600 text-sm">Leave Type:</span> <span class="font-semibold capitalize">${req.leave_type}</span></div>
+                    <div><span class="text-gray-600 text-sm">Duration:</span> <span class="font-semibold">${req.start_date} to ${req.end_date}</span></div>
+                </div>
+            </div>
+            
+            <div>
+                <h4 class="font-semibold mb-2">Reason</h4>
+                <p class="text-gray-700 bg-gray-50 p-3 rounded-lg">${req.reason}</p>
+            </div>
+            
+            <div class="flex space-x-3 pt-4 border-t">
+                <button onclick="approveLeave(${req.id})" class="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold">
+                    <i class="fas fa-check mr-2"></i> Approve
+                </button>
+                <button onclick="showRejectForm('leave', ${req.id})" class="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 font-semibold">
+                    <i class="fas fa-times mr-2"></i> Reject
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('leaveModal').classList.add('active');
+}
+
+async function approveSignup(id) {
+    if (!confirm('Approve this signup request? The user will be able to log in.')) return;
+    
+    try {
+        const response = await apiRequest(`/admin/signup/requests/${id}/approve`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            showToast('Signup request approved!', 'success');
+            closeModals();
+            loadAllRequests();
+        } else {
+            const data = await response.json();
+            showToast(data.error || 'Failed to approve', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Operation failed', 'error');
+    }
+}
+
+async function approveEnrollment(id) {
+    if (!confirm('Approve this enrollment request? Face embeddings will be generated.')) return;
+    
+    try {
+        const response = await apiRequest(`/admin/enrollment/requests/${id}/approve`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            showToast('Enrollment approved successfully!', 'success');
+            closeModals();
+            loadAllRequests();
+        } else {
+            const data = await response.json();
+            showToast(data.error || 'Failed to approve', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Operation failed', 'error');
+    }
+}
+
+async function approveLeave(id) {
+    if (!confirm('Approve this leave request?')) return;
+    
+    try {
+        const response = await apiRequest(`/admin/leave/requests/${id}/approve`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            showToast('Leave request approved!', 'success');
+            closeModals();
+            loadAllRequests();
+        } else {
+            const data = await response.json();
+            showToast(data.error || 'Failed to approve', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Operation failed', 'error');
+    }
+}
+
+function showRejectForm(type, id) {
+    const reason = prompt('Please provide a reason for rejection:');
+    if (!reason) return;
+    
+    if (type === 'signup') rejectSignup(id, reason);
+    else if (type === 'enrollment') rejectEnrollment(id, reason);
+    else if (type === 'leave') rejectLeave(id, reason);
+}
+
+async function rejectSignup(id, reason) {
+    try {
+        const response = await apiRequest(`/admin/signup/requests/${id}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ reason })
+        });
+        
+        if (response.ok) {
+            showToast('Signup request rejected', 'info');
+            closeModals();
+            loadAllRequests();
+        } else {
+            const data = await response.json();
+            showToast(data.error || 'Failed to reject', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Operation failed', 'error');
+    }
+}
+
+async function rejectEnrollment(id, reason) {
+    try {
+        const response = await apiRequest(`/admin/enrollment/requests/${id}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ reason })
+        });
+        
+        if (response.ok) {
+            showToast('Enrollment request rejected', 'info');
+            closeModals();
+            loadAllRequests();
+        } else {
+            const data = await response.json();
+            showToast(data.error || 'Failed to reject', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Operation failed', 'error');
+    }
+}
+
+async function rejectLeave(id, reason) {
+    try {
+        const response = await apiRequest(`/admin/leave/requests/${id}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ reason })
+        });
+        
+        if (response.ok) {
+            showToast('Leave request rejected', 'info');
+            closeModals();
+            loadAllRequests();
+        } else {
+            const data = await response.json();
+            showToast(data.error || 'Failed to reject', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Operation failed', 'error');
+    }
+}
+
+function closeModals() {
+    document.getElementById('signupModal').classList.remove('active');
+    document.getElementById('enrollmentModal').classList.remove('active');
+    document.getElementById('leaveModal').classList.remove('active');
+}
+</script>
+{% endblock %}

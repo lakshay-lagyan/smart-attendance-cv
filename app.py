@@ -68,7 +68,7 @@ def register_page():
 
 @app.route('/superadmin/dashboard')
 def superadmin_dashboard():
-    return render_template('superadmin/dashboard.html')
+    return render_template('superadmin/dashboard_enhanced.html')
 
 @app.route('/superadmin/admins')
 def superadmin_admins():
@@ -88,15 +88,15 @@ def admin_dashboard():
 
 @app.route('/admin/enrollment')
 def admin_enrollment():
-    return render_template('admin/enrollment.html')
+    return render_template('admin/enrollment_enhanced.html')
 
 @app.route('/admin/requests')
 def admin_requests():
-    return render_template('admin/requests.html')
+    return render_template('admin/requests_enhanced.html')
 
 @app.route('/user/dashboard')
 def user_dashboard():
-    return render_template('user/dashboard.html')
+    return render_template('user/dashboard_enhanced.html')
 
 from routes.auth import auth_bp
 from routes.admin_api import admin_api_bp

@@ -1,0 +1,583 @@
+{% extends "base.html" %}
+
+{% block title %}User Dashboard{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+    #video, #canvas { border-radius: 8px; }
+    .sidebar { 
+        transition: transform 0.3s ease; 
+    }
+    @media (max-width: 768px) {
+        .sidebar.hidden-mobile { 
+            transform: translateX(-100%); 
+        }
+        #video { max-width: 100%; height: auto; }
+    }
+    .stat-card {
+        transition: transform 0.2s;
+    }
+    .stat-card:hover {
+        transform: translateY(-4px);
+    }
+    .modal { display: none; }
+    .modal.active { display: flex; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-50">
+    <!-- Sidebar with Toggle -->
+    <div id="sidebar" class="sidebar fixed md:static w-64 bg-gradient-to-b from-blue-600 to-blue-900 text-white h-full z-50 overflow-y-auto">
+        <div class="p-6 border-b border-blue-500">
+            <h1 class="text-2xl font-bold">User Panel</h1>
+        </div>
+        
+        <nav class="p-4">
+            <a href="/user/dashboard" class="flex items-center p-3 mb-2 bg-blue-700 rounded-lg">
+                <i class="fas fa-dashboard mr-3"></i> Dashboard
+            </a>
+            <button onclick="logout()" class="w-full flex items-center p-3 mt-4 hover:bg-red-600 rounded-lg">
+                <i class="fas fa-sign-out-alt mr-3"></i> Logout
+            </button>
+        </nav>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="flex-1 overflow-auto">
+        <!-- Top Bar with Menu Toggle -->
+        <div class="bg-white shadow-sm p-4 flex justify-between items-center sticky top-0 z-40">
+            <div class="flex items-center gap-3">
+                <button id="menuToggle" class="text-gray-600 hover:text-gray-800 focus:outline-none">
+                    <i class="fas fa-bars text-2xl"></i>
+                </button>
+                <h2 class="text-2xl font-bold text-gray-800">My Dashboard</h2>
+            </div>
+            <div id="userInfo" class="text-right"></div>
+        </div>
+        
+        <div class="p-4 md:p-6 space-y-6">
+            <!-- Quick Stats Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="stat-card bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Total Attendance</p>
+                            <p id="totalAttendance" class="text-3xl font-bold text-blue-600">0</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <i class="fas fa-calendar-check text-3xl text-blue-600"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="stat-card bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">On-Time Rate</p>
+                            <p id="onTimeRate" class="text-3xl font-bold text-green-600">0%</p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <i class="fas fa-clock text-3xl text-green-600"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="stat-card bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Approved Leaves</p>
+                            <p id="approvedLeaves" class="text-3xl font-bold text-purple-600">0</p>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <i class="fas fa-calendar-times text-3xl text-purple-600"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="stat-card bg-white rounded-lg shadow-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Absences (30d)</p>
+                            <p id="absenceDays" class="text-3xl font-bold text-red-600">0</p>
+                        </div>
+                        <div class="bg-red-100 p-3 rounded-full">
+                            <i class="fas fa-user-times text-3xl text-red-600"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Today's Attendance Status -->
+            <div id="todayStatus" class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-bold mb-4 flex items-center">
+                    <i class="fas fa-calendar-day mr-2 text-blue-600"></i>
+                    Today's Status
+                </h3>
+                <div id="todayStatusContent"></div>
+            </div>
+            
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Daily Login Time Trends -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-chart-line mr-2 text-blue-600"></i>
+                        Daily Login Times (Last 30 Days)
+                    </h3>
+                    <canvas id="loginTimeChart" height="250"></canvas>
+                </div>
+                
+                <!-- Late vs On-Time Ratio -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fas fa-chart-pie mr-2 text-green-600"></i>
+                        Punctuality Overview
+                    </h3>
+                    <canvas id="punctualityChart" height="250"></canvas>
+                </div>
+            </div>
+            
+            <!-- Leave Management Section -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold flex items-center">
+                        <i class="fas fa-calendar-alt mr-2 text-purple-600"></i>
+                        Leave Management
+                    </h3>
+                    <button onclick="showLeaveModal()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
+                        <i class="fas fa-plus mr-2"></i> Request Leave
+                    </button>
+                </div>
+                
+                <!-- Leave Summary -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                        <p class="text-sm text-yellow-800 font-medium">Pending Requests</p>
+                        <p id="pendingLeaves" class="text-2xl font-bold text-yellow-900">0</p>
+                    </div>
+                    <div class="bg-green-50 border-l-4 border-green-400 p-4 rounded">
+                        <p class="text-sm text-green-800 font-medium">Approved Leaves</p>
+                        <p id="approvedLeavesCount" class="text-2xl font-bold text-green-900">0</p>
+                    </div>
+                    <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded">
+                        <p class="text-sm text-red-800 font-medium">Rejected Requests</p>
+                        <p id="rejectedLeaves" class="text-2xl font-bold text-red-900">0</p>
+                    </div>
+                </div>
+                
+                <!-- Leave Requests Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="p-3 text-left text-sm font-semibold">Date Range</th>
+                                <th class="p-3 text-left text-sm font-semibold">Type</th>
+                                <th class="p-3 text-left text-sm font-semibold">Status</th>
+                                <th class="p-3 text-left text-sm font-semibold hidden md:table-cell">Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaveRequestsTable" class="divide-y">
+                            <tr><td colspan="4" class="p-4 text-center text-gray-500">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Attendance Log -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-bold mb-4 flex items-center">
+                    <i class="fas fa-history mr-2 text-blue-600"></i>
+                    Recent Attendance Log
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="p-3 text-left text-sm font-semibold">Date</th>
+                                <th class="p-3 text-left text-sm font-semibold">Time</th>
+                                <th class="p-3 text-left text-sm font-semibold">Status</th>
+                                <th class="p-3 text-left text-sm font-semibold hidden md:table-cell">Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceTable" class="divide-y">
+                            <tr><td colspan="4" class="p-4 text-center text-gray-500">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Leave Request Modal -->
+<div id="leaveModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-lg max-w-md w-full">
+        <div class="p-6 border-b flex justify-between items-center">
+            <h3 class="text-xl font-bold">Request Leave</h3>
+            <button onclick="closeLeaveModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        
+        <form id="leaveForm" class="p-6 space-y-4">
+            <div>
+                <label class="block font-semibold mb-2">Start Date</label>
+                <input type="date" id="startDate" required class="w-full px-4 py-2 border rounded-lg">
+            </div>
+            <div>
+                <label class="block font-semibold mb-2">End Date</label>
+                <input type="date" id="endDate" required class="w-full px-4 py-2 border rounded-lg">
+            </div>
+            <div>
+                <label class="block font-semibold mb-2">Leave Type</label>
+                <select id="leaveType" required class="w-full px-4 py-2 border rounded-lg">
+                    <option value="">Select Type</option>
+                    <option value="sick">Sick Leave</option>
+                    <option value="vacation">Vacation</option>
+                    <option value="personal">Personal Leave</option>
+                    <option value="emergency">Emergency Leave</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-semibold mb-2">Reason</label>
+                <textarea id="leaveReason" required rows="3" class="w-full px-4 py-2 border rounded-lg" placeholder="Please provide a reason..."></textarea>
+            </div>
+            <button type="submit" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
+                Submit Request
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+let loginTimeChart, punctualityChart;
+
+document.addEventListener('DOMContentLoaded', () => {
+    const sidebar = document.getElementById('sidebar');
+    const menuToggle = document.getElementById('menuToggle');
+    
+    // Toggle sidebar on mobile
+    menuToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('hidden-mobile');
+    });
+    
+    // Close sidebar when clicking outside on mobile
+    document.addEventListener('click', (e) => {
+        if (window.innerWidth < 768) {
+            if (!sidebar.contains(e.target) && !menuToggle.contains(e.target)) {
+                sidebar.classList.add('hidden-mobile');
+            }
+        }
+    });
+    
+    loadUserInfo();
+    loadUserStats();
+    loadAttendanceHistory();
+    loadLeaveRequests();
+    loadChartData();
+    
+    document.getElementById('leaveForm').addEventListener('submit', submitLeaveRequest);
+});
+
+async function loadUserInfo() {
+    try {
+        const response = await apiRequest('/auth/me');
+        const data = await response.json();
+        
+        if (response.ok) {
+            document.getElementById('userInfo').innerHTML = `
+                <p class="font-semibold text-gray-800">${data.user.name}</p>
+                <p class="text-sm text-gray-600">${data.user.email}</p>
+            `;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+async function loadUserStats() {
+    try {
+        const response = await apiRequest('/user/stats');
+        const data = await response.json();
+        
+        if (response.ok) {
+            document.getElementById('totalAttendance').textContent = data.total_attendance;
+            document.getElementById('onTimeRate').textContent = data.on_time_percentage + '%';
+            document.getElementById('approvedLeaves').textContent = data.approved_leaves;
+            document.getElementById('absenceDays').textContent = data.absence_days;
+            document.getElementById('approvedLeavesCount').textContent = data.approved_leaves;
+            document.getElementById('pendingLeaves').textContent = data.pending_leaves;
+            
+            // Display today's status
+            const todayContent = document.getElementById('todayStatusContent');
+            if (data.today_marked) {
+                const time = new Date(data.today_time);
+                const isLate = time.getHours() > 9 || (time.getHours() === 9 && time.getMinutes() > 0);
+                todayContent.innerHTML = `
+                    <div class="flex items-center gap-4">
+                        <div class="${isLate ? 'bg-yellow-100' : 'bg-green-100'} p-4 rounded-full">
+                            <i class="fas fa-${isLate ? 'clock' : 'check'} text-3xl ${isLate ? 'text-yellow-600' : 'text-green-600'}"></i>
+                        </div>
+                        <div>
+                            <p class="text-lg font-semibold ${isLate ? 'text-yellow-800' : 'text-green-800'}">
+                                ${isLate ? 'Late Arrival' : 'On Time'} - Attendance Marked
+                            </p>
+                            <p class="text-gray-600">Check-in time: ${time.toLocaleTimeString()}</p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                todayContent.innerHTML = `
+                    <div class="flex items-center gap-4">
+                        <div class="bg-red-100 p-4 rounded-full">
+                            <i class="fas fa-exclamation-triangle text-3xl text-red-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-lg font-semibold text-red-800">Attendance Not Marked Yet</p>
+                            <p class="text-gray-600">Please mark your attendance for today</p>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Create punctuality chart
+            createPunctualityChart(data.on_time_count, data.late_count);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+async function loadChartData() {
+    try {
+        const response = await apiRequest('/user/attendance/chart?days=30');
+        const data = await response.json();
+        
+        if (response.ok) {
+            createLoginTimeChart(data.daily_times);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+function createLoginTimeChart(dailyTimes) {
+    const ctx = document.getElementById('loginTimeChart').getContext('2d');
+    
+    const dates = dailyTimes.map(d => {
+        const date = new Date(d.date);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+    const times = dailyTimes.map(d => d.hour);
+    
+    loginTimeChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: dates,
+            datasets: [{
+                label: 'Login Time (Hour)',
+                data: times,
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const hour = Math.floor(context.parsed.y);
+                            const minute = Math.round((context.parsed.y - hour) * 60);
+                            return `Time: ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    min: 7,
+                    max: 12,
+                    ticks: {
+                        callback: function(value) {
+                            return value + ':00';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function createPunctualityChart(onTime, late) {
+    const ctx = document.getElementById('punctualityChart').getContext('2d');
+    
+    punctualityChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['On Time', 'Late'],
+            datasets: [{
+                data: [onTime, late],
+                backgroundColor: [
+                    'rgb(34, 197, 94)',
+                    'rgb(234, 179, 8)'
+                ],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+async function loadAttendanceHistory() {
+    try {
+        const response = await apiRequest('/user/attendance/history?per_page=10');
+        const data = await response.json();
+        
+        if (response.ok && data.attendance.length > 0) {
+            const html = data.attendance.map(a => {
+                const date = new Date(a.timestamp);
+                const time = date.toLocaleTimeString();
+                const isLate = date.getHours() > 9 || (date.getHours() === 9 && date.getMinutes() > 0);
+                
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-3">${date.toLocaleDateString()}</td>
+                        <td class="p-3 font-medium">${time}</td>
+                        <td class="p-3">
+                            <span class="px-2 py-1 rounded text-xs font-medium ${isLate ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}">
+                                ${isLate ? 'Late' : 'On Time'}
+                            </span>
+                        </td>
+                        <td class="p-3 hidden md:table-cell">
+                            <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                                ${(a.confidence * 100).toFixed(1)}%
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            document.getElementById('attendanceTable').innerHTML = html;
+        } else {
+            document.getElementById('attendanceTable').innerHTML = 
+                '<tr><td colspan="4" class="p-4 text-center text-gray-500">No attendance records yet</td></tr>';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+async function loadLeaveRequests() {
+    try {
+        const response = await apiRequest('/user/leave/requests');
+        const data = await response.json();
+        
+        if (response.ok) {
+            const requests = data.requests || [];
+            const rejected = requests.filter(r => r.status === 'rejected').length;
+            document.getElementById('rejectedLeaves').textContent = rejected;
+            
+            if (requests.length > 0) {
+                const html = requests.slice(0, 10).map(req => {
+                    const statusColors = {
+                        pending: 'bg-yellow-100 text-yellow-800',
+                        approved: 'bg-green-100 text-green-800',
+                        rejected: 'bg-red-100 text-red-800'
+                    };
+                    
+                    return `
+                        <tr class="hover:bg-gray-50">
+                            <td class="p-3">
+                                <div class="text-sm">${new Date(req.start_date).toLocaleDateString()} - ${new Date(req.end_date).toLocaleDateString()}</div>
+                            </td>
+                            <td class="p-3">
+                                <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-medium capitalize">
+                                    ${req.leave_type}
+                                </span>
+                            </td>
+                            <td class="p-3">
+                                <span class="px-2 py-1 rounded text-xs font-medium ${statusColors[req.status]}">
+                                    ${req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                                </span>
+                            </td>
+                            <td class="p-3 text-sm text-gray-600 hidden md:table-cell">${req.reason}</td>
+                        </tr>
+                    `;
+                }).join('');
+                
+                document.getElementById('leaveRequestsTable').innerHTML = html;
+            } else {
+                document.getElementById('leaveRequestsTable').innerHTML = 
+                    '<tr><td colspan="4" class="p-4 text-center text-gray-500">No leave requests yet</td></tr>';
+            }
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+function showLeaveModal() {
+    document.getElementById('leaveModal').classList.add('active');
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('startDate').min = today;
+    document.getElementById('endDate').min = today;
+}
+
+function closeLeaveModal() {
+    document.getElementById('leaveModal').classList.remove('active');
+    document.getElementById('leaveForm').reset();
+}
+
+async function submitLeaveRequest(e) {
+    e.preventDefault();
+    
+    const data = {
+        start_date: document.getElementById('startDate').value,
+        end_date: document.getElementById('endDate').value,
+        leave_type: document.getElementById('leaveType').value,
+        reason: document.getElementById('leaveReason').value
+    };
+    
+    try {
+        const response = await apiRequest('/user/leave/submit', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showToast('Leave request submitted successfully!', 'success');
+            closeLeaveModal();
+            loadLeaveRequests();
+            loadUserStats();
+        } else {
+            showToast(result.error || 'Failed to submit request', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('Failed to submit request', 'error');
+    }
+}
+</script>
+{% endblock %}

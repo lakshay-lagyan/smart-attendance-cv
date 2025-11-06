@@ -212,3 +212,19 @@ def get_attendance_stats():
             for stat in daily_stats
         ]
     })
+
+@superadmin_api_bp.route('/attendance/live', methods=['GET'])
+@require_superadmin
+def get_live_attendance():
+    """Get today's attendance records in real-time"""
+    limit = request.args.get('limit', 10, type=int)
+    today = datetime.utcnow().date()
+    
+    attendance_records = Attendance.query.filter(
+        func.date(Attendance.timestamp) == today
+    ).order_by(Attendance.timestamp.desc()).limit(limit).all()
+    
+    return jsonify({
+        'attendance': [att.to_dict() for att in attendance_records],
+        'count': len(attendance_records)
+    })
