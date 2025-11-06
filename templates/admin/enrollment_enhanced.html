@@ -2,6 +2,10 @@
 
 {% block title %}Enhanced Enrollment - Admin{% endblock %}
 
+{% block extra_head %}
+<script src="/static/js/camera-utils.js"></script>
+{% endblock %}
+
 {% block extra_styles %}
 <style>
     #video, #canvas { border-radius: 8px; }
@@ -39,6 +43,9 @@
 {% endblock %}
 
 {% block content %}
+<!-- Mobile Overlay -->
+<div id="sidebarOverlay" class="sidebar-overlay"></div>
+
 <div class="flex h-screen bg-gray-50">
     <div id="sidebar" class="sidebar fixed md:static w-64 bg-gradient-to-b from-blue-600 to-blue-900 text-white h-full z-50 overflow-y-auto">
         <div class="p-6 border-b border-blue-500">
@@ -259,10 +266,27 @@ let faceDetectionInterval;
 document.addEventListener('DOMContentLoaded', () => {
     const sidebar = document.getElementById('sidebar');
     const menuToggle = document.getElementById('menuToggle');
+    const overlay = document.getElementById('sidebarOverlay');
     
-    menuToggle.addEventListener('click', () => {
+    function toggleSidebar() {
         sidebar.classList.toggle('hidden-mobile');
-    });
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+    }
+    
+    menuToggle.addEventListener('click', toggleSidebar);
+    overlay.addEventListener('click', toggleSidebar);
+    
+    if (window.innerWidth <= 768) {
+        const sidebarLinks = sidebar.querySelectorAll('a');
+        sidebarLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                sidebar.classList.add('hidden-mobile');
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+            });
+        });
+    }
     
     video = document.getElementById('video');
     canvas = document.getElementById('canvas');
@@ -301,15 +325,8 @@ function setupCamera() {
     
     startBtn.addEventListener('click', async () => {
         try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { 
-                    facingMode: 'user',
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                }
-            });
-            
-            video.srcObject = stream;
+            // Use camera manager for better mobile support
+            stream = await cameraManager.startCamera(video, true);
             
             startBtn.disabled = true;
             stopBtn.disabled = false;
@@ -320,15 +337,24 @@ function setupCamera() {
             // Start quality assessment
             startQualityAssessment();
             
-            showToast('Camera started', 'success');
+            showToast('Camera started successfully', 'success');
         } catch (error) {
-            console.error('Camera error:', error);
-            showToast('Failed to start camera', 'error');
+            // Error handling is done in camera manager
+            startBtn.disabled = false;
         }
     });
     
     stopBtn.addEventListener('click', () => {
-        stopCameraStream();
+        cameraManager.stopCamera();
+        stream = null;
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        captureBtn.disabled = true;
+        document.getElementById('qualityMetrics').classList.add('hidden');
+        if (faceDetectionInterval) {
+            clearInterval(faceDetectionInterval);
+        }
+        showToast('Camera stopped', 'info');
     });
     
     captureBtn.addEventListener('click', () => {

@@ -86,6 +86,8 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     is_enrolled = db.Column(db.Boolean, default=False)
+    email_verified = db.Column(db.Boolean, default=False)
+    verified_at = db.Column(db.DateTime, nullable=True)
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -104,6 +106,8 @@ class User(db.Model):
             'status': self.status,
             'role': 'user',
             'is_enrolled': self.is_enrolled,
+            'email_verified': self.email_verified,
+            'verified_at': self.verified_at.isoformat() if self.verified_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'last_login': self.last_login.isoformat() if self.last_login else None
         }
@@ -135,6 +139,31 @@ class Person(db.Model):
         }
 
 
+class EmailVerification(db.Model):
+    """Email verification codes for user verification"""
+    __tablename__ = 'email_verifications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    email = db.Column(db.String(120), nullable=False, index=True)
+    verification_code = db.Column(db.String(6), nullable=False)
+    is_used = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    
+    user = db.relationship('User', backref='verification_codes')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'email': self.email,
+            'is_used': self.is_used,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None
+        }
+
+
 class SignupRequest(db.Model):
     """Signup request from new users requiring admin approval"""
     __tablename__ = 'signup_requests'
@@ -152,6 +181,8 @@ class SignupRequest(db.Model):
     processed_at = db.Column(db.DateTime, nullable=True)
     processed_by = db.Column(db.String(120), nullable=True)
     rejection_reason = db.Column(db.Text, nullable=True)
+    requires_verification = db.Column(db.Boolean, default=False)
+    verification_sent_at = db.Column(db.DateTime, nullable=True)
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

@@ -102,11 +102,16 @@
 /* Mobile Sidebar */
 @media (max-width: 768px) {
     .sidebar {
+        transform: translateX(-100%);
+    }
+    
+    .sidebar.active {
         transform: translateX(0);
     }
     
-    .sidebar.hidden-mobile {
-        transform: translateX(-100%);
+    /* Backward compatibility */
+    .sidebar:not(.hidden-mobile) {
+        transform: translateX(0);
     }
 }
 
@@ -128,10 +133,15 @@
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
     z-index: 40;
+    opacity: 0;
+    transition: opacity 300ms ease-in-out;
 }
 
-.sidebar-overlay.active {
-    display: block;
+@media (max-width: 768px) {
+    .sidebar-overlay.active {
+        display: block;
+        opacity: 1;
+    }
 }
 
 /* Scrollbar for sidebar */

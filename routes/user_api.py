@@ -1,9 +1,11 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
-from models import db, User, EnrollmentRequest, Attendance, Person, LeaveRequest
+from models import db, User, EnrollmentRequest, Attendance, Person, LeaveRequest, EmailVerification
 from face_service import face_service
+from email_service import email_service
 import pickle
+from datetime import timedelta
 
 user_api_bp = Blueprint('user_api', __name__)
 
@@ -16,6 +18,97 @@ def require_user(fn):
         return fn(*args, **kwargs)
     wrapper.__name__ = fn.__name__
     return wrapper
+
+@user_api_bp.route('/verify-email', methods=['POST'])
+@require_user
+def verify_email():
+    """Verify user email with verification code"""
+    identity = get_jwt_identity()
+    user_id = identity.get('id')
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    if user.email_verified:
+        return jsonify({'error': 'Email already verified'}), 400
+    
+    data = request.get_json()
+    code = data.get('code', '').strip()
+    
+    if not code:
+        return jsonify({'error': 'Verification code required'}), 400
+    
+    # Find valid verification code
+    verification = EmailVerification.query.filter_by(
+        user_id=user_id,
+        verification_code=code,
+        is_used=False
+    ).filter(
+        EmailVerification.expires_at > datetime.utcnow()
+    ).first()
+    
+    if not verification:
+        return jsonify({'error': 'Invalid or expired verification code'}), 400
+    
+    # Mark as verified
+    user.email_verified = True
+    user.verified_at = datetime.utcnow()
+    verification.is_used = True
+    
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'Email verified successfully',
+        'user': user.to_dict()
+    })
+
+@user_api_bp.route('/resend-verification', methods=['POST'])
+@require_user
+def resend_verification():
+    """Resend verification code to user email"""
+    identity = get_jwt_identity()
+    user_id = identity.get('id')
+    
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    if user.email_verified:
+        return jsonify({'error': 'Email already verified'}), 400
+    
+    # Invalidate old codes
+    EmailVerification.query.filter_by(
+        user_id=user_id,
+        is_used=False
+    ).update({'is_used': True})
+    
+    # Generate new code
+    verification_code = email_service.generate_verification_code()
+    
+    verification = EmailVerification(
+        user_id=user.id,
+        email=user.email,
+        verification_code=verification_code,
+        expires_at=datetime.utcnow() + timedelta(hours=24)
+    )
+    db.session.add(verification)
+    db.session.commit()
+    
+    # Send email
+    email_sent = email_service.send_verification_code(
+        user.email,
+        verification_code,
+        user.name
+    )
+    
+    response_data = {'message': 'Verification code sent to your email'}
+    
+    if not email_service.enabled:
+        response_data['verification_code'] = verification_code
+        response_data['note'] = 'Email service disabled. Use this code to verify.'
+    
+    return jsonify(response_data)
 
 @user_api_bp.route('/enrollment/submit', methods=['POST'])
 @require_user

@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 from sqlalchemy import func
 import pickle
 import base64
-from models import db, Admin, User, Person, Attendance, EnrollmentRequest, SignupRequest, LeaveRequest, SystemLog
+from models import db, Admin, User, Person, Attendance, EnrollmentRequest, SignupRequest, LeaveRequest, SystemLog, EmailVerification
 from face_service import face_service
+from email_service import email_service
 
 admin_api_bp = Blueprint('admin_api', __name__)
 
@@ -265,6 +266,9 @@ def approve_signup_request(request_id):
     if signup_req.status != 'pending':
         return jsonify({'error': 'Request already processed'}), 400
     
+    data = request.get_json() or {}
+    send_verification = data.get('send_verification', True)
+    
     try:
         # Create user from signup request
         user = User(
@@ -273,16 +277,45 @@ def approve_signup_request(request_id):
             phone=signup_req.phone,
             department=signup_req.department,
             profile_image=signup_req.profile_image,
-            status='active'
+            status='active',
+            email_verified=False if send_verification else True
         )
         user.password_hash = signup_req.password_hash  # Copy hashed password directly
         
         db.session.add(user)
+        db.session.flush()  # Get user ID
         
         identity = get_jwt_identity()
         signup_req.status = 'approved'
         signup_req.processed_at = datetime.utcnow()
         signup_req.processed_by = identity.get('email')
+        
+        # Send verification code if requested
+        verification_code = None
+        if send_verification:
+            verification_code = email_service.generate_verification_code()
+            
+            # Create verification record
+            verification = EmailVerification(
+                user_id=user.id,
+                email=user.email,
+                verification_code=verification_code,
+                expires_at=datetime.utcnow() + timedelta(hours=24)
+            )
+            db.session.add(verification)
+            
+            # Send email
+            email_sent = email_service.send_verification_code(
+                user.email,
+                verification_code,
+                user.name
+            )
+            
+            signup_req.requires_verification = True
+            signup_req.verification_sent_at = datetime.utcnow() if email_sent else None
+        else:
+            # Send simple approval notification
+            email_service.send_approval_notification(user.email, user.name)
         
         db.session.commit()
         
@@ -291,16 +324,23 @@ def approve_signup_request(request_id):
             user_type=identity.get('type'),
             user_id=identity.get('id'),
             user_email=identity.get('email'),
-            details=f'Approved signup for {signup_req.email}',
+            details=f'Approved signup for {signup_req.email}' + (' with verification' if send_verification else ''),
             ip_address=request.remote_addr
         )
         db.session.add(log)
         db.session.commit()
         
-        return jsonify({
+        response_data = {
             'message': 'Signup request approved successfully',
-            'user': user.to_dict()
-        })
+            'user': user.to_dict(),
+            'requires_verification': send_verification
+        }
+        
+        if send_verification and not email_service.enabled:
+            response_data['verification_code'] = verification_code
+            response_data['note'] = 'Email service disabled. Share this code with the user.'
+        
+        return jsonify(response_data)
     
     except Exception as e:
         db.session.rollback()
