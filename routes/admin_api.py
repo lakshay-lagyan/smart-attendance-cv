@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import func
 import pickle
 import base64
-from models import db, Admin, User, Person, Attendance, EnrollmentRequest, SystemLog
+from models import db, Admin, User, Person, Attendance, EnrollmentRequest, SignupRequest, LeaveRequest, SystemLog
 from face_service import face_service
 
 admin_api_bp = Blueprint('admin_api', __name__)
@@ -235,3 +235,189 @@ def get_attendance():
 def get_users():
     users = User.query.filter_by(status='active').all()
     return jsonify({'users': [u.to_dict() for u in users]})
+
+# Signup Request Management
+@admin_api_bp.route('/signup/requests', methods=['GET'])
+@require_admin
+def get_signup_requests():
+    status = request.args.get('status', 'pending')
+    requests = SignupRequest.query.filter_by(status=status).order_by(
+        SignupRequest.submitted_at.desc()
+    ).all()
+    
+    return jsonify({
+        'requests': [req.to_dict(include_documents=True) for req in requests]
+    })
+
+@admin_api_bp.route('/signup/requests/count', methods=['GET'])
+@require_admin
+def get_signup_requests_count():
+    count = SignupRequest.query.filter_by(status='pending').count()
+    return jsonify({'count': count})
+
+@admin_api_bp.route('/signup/requests/<int:request_id>/approve', methods=['POST'])
+@require_admin
+def approve_signup_request(request_id):
+    signup_req = SignupRequest.query.get(request_id)
+    if not signup_req:
+        return jsonify({'error': 'Request not found'}), 404
+    
+    if signup_req.status != 'pending':
+        return jsonify({'error': 'Request already processed'}), 400
+    
+    try:
+        # Create user from signup request
+        user = User(
+            name=signup_req.name,
+            email=signup_req.email,
+            phone=signup_req.phone,
+            department=signup_req.department,
+            profile_image=signup_req.profile_image,
+            status='active'
+        )
+        user.password_hash = signup_req.password_hash  # Copy hashed password directly
+        
+        db.session.add(user)
+        
+        identity = get_jwt_identity()
+        signup_req.status = 'approved'
+        signup_req.processed_at = datetime.utcnow()
+        signup_req.processed_by = identity.get('email')
+        
+        db.session.commit()
+        
+        log = SystemLog(
+            action='approve_signup',
+            user_type=identity.get('type'),
+            user_id=identity.get('id'),
+            user_email=identity.get('email'),
+            details=f'Approved signup for {signup_req.email}',
+            ip_address=request.remote_addr
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Signup request approved successfully',
+            'user': user.to_dict()
+        })
+    
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@admin_api_bp.route('/signup/requests/<int:request_id>/reject', methods=['POST'])
+@require_admin
+def reject_signup_request(request_id):
+    signup_req = SignupRequest.query.get(request_id)
+    if not signup_req:
+        return jsonify({'error': 'Request not found'}), 404
+    
+    if signup_req.status != 'pending':
+        return jsonify({'error': 'Request already processed'}), 400
+    
+    data = request.get_json()
+    reason = data.get('reason', 'Not specified')
+    
+    identity = get_jwt_identity()
+    signup_req.status = 'rejected'
+    signup_req.processed_at = datetime.utcnow()
+    signup_req.processed_by = identity.get('email')
+    signup_req.rejection_reason = reason
+    
+    db.session.commit()
+    
+    log = SystemLog(
+        action='reject_signup',
+        user_type=identity.get('type'),
+        user_id=identity.get('id'),
+        user_email=identity.get('email'),
+        details=f'Rejected signup for {signup_req.email}: {reason}',
+        ip_address=request.remote_addr
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    return jsonify({'message': 'Signup request rejected'})
+
+# Leave Request Management
+@admin_api_bp.route('/leave/requests', methods=['GET'])
+@require_admin
+def get_leave_requests():
+    status = request.args.get('status', 'pending')
+    requests = LeaveRequest.query.filter_by(status=status).order_by(
+        LeaveRequest.submitted_at.desc()
+    ).all()
+    
+    result = []
+    for req in requests:
+        req_dict = req.to_dict()
+        if req.user:
+            req_dict['user_name'] = req.user.name
+        result.append(req_dict)
+    
+    return jsonify({'requests': result})
+
+@admin_api_bp.route('/leave/requests/<int:request_id>/approve', methods=['POST'])
+@require_admin
+def approve_leave_request(request_id):
+    leave_req = LeaveRequest.query.get(request_id)
+    if not leave_req:
+        return jsonify({'error': 'Request not found'}), 404
+    
+    if leave_req.status != 'pending':
+        return jsonify({'error': 'Request already processed'}), 400
+    
+    identity = get_jwt_identity()
+    leave_req.status = 'approved'
+    leave_req.processed_at = datetime.utcnow()
+    leave_req.processed_by = identity.get('email')
+    
+    db.session.commit()
+    
+    log = SystemLog(
+        action='approve_leave',
+        user_type=identity.get('type'),
+        user_id=identity.get('id'),
+        user_email=identity.get('email'),
+        details=f'Approved leave request for user {leave_req.user_id}',
+        ip_address=request.remote_addr
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    return jsonify({'message': 'Leave request approved'})
+
+@admin_api_bp.route('/leave/requests/<int:request_id>/reject', methods=['POST'])
+@require_admin
+def reject_leave_request(request_id):
+    leave_req = LeaveRequest.query.get(request_id)
+    if not leave_req:
+        return jsonify({'error': 'Request not found'}), 404
+    
+    if leave_req.status != 'pending':
+        return jsonify({'error': 'Request already processed'}), 400
+    
+    data = request.get_json()
+    reason = data.get('reason', 'Not specified')
+    
+    identity = get_jwt_identity()
+    leave_req.status = 'rejected'
+    leave_req.processed_at = datetime.utcnow()
+    leave_req.processed_by = identity.get('email')
+    leave_req.rejection_reason = reason
+    
+    db.session.commit()
+    
+    log = SystemLog(
+        action='reject_leave',
+        user_type=identity.get('type'),
+        user_id=identity.get('id'),
+        user_email=identity.get('email'),
+        details=f'Rejected leave request for user {leave_req.user_id}: {reason}',
+        ip_address=request.remote_addr
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    return jsonify({'message': 'Leave request rejected'})

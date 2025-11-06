@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
-from models import db, User, EnrollmentRequest, Attendance, Person
+from models import db, User, EnrollmentRequest, Attendance, Person, LeaveRequest
 from face_service import face_service
 import pickle
 
@@ -169,6 +169,9 @@ def get_user_stats():
     identity = get_jwt_identity()
     user_id = identity.get('id')
     
+    from datetime import timedelta, time
+    from sqlalchemy import func, and_, extract
+    
     total_attendance = Attendance.query.filter_by(user_id=user_id).count()
     
     today = datetime.utcnow().date()
@@ -176,7 +179,186 @@ def get_user_stats():
         db.func.date(Attendance.timestamp) == today
     ).first() is not None
     
+    # Get today's attendance record
+    today_record = Attendance.query.filter_by(user_id=user_id).filter(
+        db.func.date(Attendance.timestamp) == today
+    ).first()
+    
+    # Calculate late arrivals (after 9:00 AM)
+    late_threshold = time(9, 0, 0)
+    late_count = 0
+    on_time_count = 0
+    
+    all_attendance = Attendance.query.filter_by(user_id=user_id).all()
+    for att in all_attendance:
+        if att.timestamp.time() > late_threshold:
+            late_count += 1
+        else:
+            on_time_count += 1
+    
+    # Count leaves
+    approved_leaves = LeaveRequest.query.filter_by(
+        user_id=user_id, 
+        status='approved'
+    ).count()
+    
+    pending_leaves = LeaveRequest.query.filter_by(
+        user_id=user_id, 
+        status='pending'
+    ).count()
+    
+    # Calculate absence frequency (days without attendance in last 30 days)
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    attendance_dates = set([
+        att.timestamp.date() 
+        for att in Attendance.query.filter(
+            and_(
+                Attendance.user_id == user_id,
+                Attendance.timestamp >= thirty_days_ago
+            )
+        ).all()
+    ])
+    
+    # Get working days (excluding weekends)
+    working_days = 0
+    current_date = thirty_days_ago.date()
+    while current_date <= today:
+        if current_date.weekday() < 5:  # Monday to Friday
+            working_days += 1
+        current_date += timedelta(days=1)
+    
+    absence_days = working_days - len(attendance_dates)
+    
+    # Get monthly attendance
+    monthly_attendance = db.session.query(
+        func.strftime('%Y-%m', Attendance.timestamp).label('month'),
+        func.count(Attendance.id).label('count')
+    ).filter(
+        Attendance.user_id == user_id
+    ).group_by(
+        func.strftime('%Y-%m', Attendance.timestamp)
+    ).order_by(
+        func.strftime('%Y-%m', Attendance.timestamp).desc()
+    ).limit(12).all()
+    
     return jsonify({
         'total_attendance': total_attendance,
-        'today_marked': today_marked
+        'today_marked': today_marked,
+        'today_time': today_record.timestamp.isoformat() if today_record else None,
+        'late_count': late_count,
+        'on_time_count': on_time_count,
+        'late_percentage': round((late_count / total_attendance * 100) if total_attendance > 0 else 0, 2),
+        'on_time_percentage': round((on_time_count / total_attendance * 100) if total_attendance > 0 else 0, 2),
+        'approved_leaves': approved_leaves,
+        'pending_leaves': pending_leaves,
+        'absence_days': absence_days,
+        'monthly_attendance': [
+            {'month': month, 'count': count} 
+            for month, count in monthly_attendance
+        ]
+    })
+
+# Leave Request Management
+@user_api_bp.route('/leave/submit', methods=['POST'])
+@require_user
+def submit_leave_request():
+    identity = get_jwt_identity()
+    user_id = identity.get('id')
+    
+    data = request.get_json()
+    start_date = data.get('start_date')
+    end_date = data.get('end_date')
+    leave_type = data.get('leave_type')
+    reason = data.get('reason')
+    
+    if not all([start_date, end_date, leave_type, reason]):
+        return jsonify({'error': 'All fields required'}), 400
+    
+    try:
+        from datetime import datetime as dt
+        start = dt.strptime(start_date, '%Y-%m-%d').date()
+        end = dt.strptime(end_date, '%Y-%m-%d').date()
+        
+        if end < start:
+            return jsonify({'error': 'End date must be after start date'}), 400
+        
+        leave_request = LeaveRequest(
+            user_id=user_id,
+            start_date=start,
+            end_date=end,
+            leave_type=leave_type,
+            reason=reason
+        )
+        
+        db.session.add(leave_request)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Leave request submitted successfully',
+            'request': leave_request.to_dict()
+        }), 201
+    
+    except ValueError as e:
+        return jsonify({'error': 'Invalid date format. Use YYYY-MM-DD'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@user_api_bp.route('/leave/requests', methods=['GET'])
+@require_user
+def get_user_leave_requests():
+    identity = get_jwt_identity()
+    user_id = identity.get('id')
+    
+    status = request.args.get('status')
+    
+    query = LeaveRequest.query.filter_by(user_id=user_id)
+    if status:
+        query = query.filter_by(status=status)
+    
+    requests = query.order_by(LeaveRequest.submitted_at.desc()).all()
+    
+    return jsonify({
+        'requests': [req.to_dict() for req in requests]
+    })
+
+@user_api_bp.route('/attendance/chart', methods=['GET'])
+@require_user
+def get_attendance_chart_data():
+    identity = get_jwt_identity()
+    user_id = identity.get('id')
+    
+    from datetime import timedelta
+    from sqlalchemy import func
+    
+    days = request.args.get('days', 30, type=int)
+    start_date = datetime.utcnow() - timedelta(days=days)
+    
+    # Daily attendance times
+    daily_records = db.session.query(
+        func.date(Attendance.timestamp).label('date'),
+        func.min(Attendance.timestamp).label('time')
+    ).filter(
+        and_(
+            Attendance.user_id == user_id,
+            Attendance.timestamp >= start_date
+        )
+    ).group_by(
+        func.date(Attendance.timestamp)
+    ).all()
+    
+    daily_times = []
+    for record in daily_records:
+        time_obj = record.time
+        # Extract hour and minute as decimal (e.g., 9:30 = 9.5)
+        time_decimal = time_obj.hour + (time_obj.minute / 60.0)
+        daily_times.append({
+            'date': str(record.date),
+            'time': time_obj.strftime('%H:%M:%S'),
+            'hour': time_decimal
+        })
+    
+    return jsonify({
+        'daily_times': daily_times,
+        'period_days': days
     })

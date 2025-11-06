@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from datetime import datetime
-from models import db, SuperAdmin, Admin, User, SystemLog
+from models import db, SuperAdmin, Admin, User, SystemLog, SignupRequest
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -81,10 +81,13 @@ def register():
     password = data.get('password')
     phone = data.get('phone', '')
     department = data.get('department', '')
+    profile_image = data.get('profile_image', '')
+    documents = data.get('documents', [])
     
     if not all([name, email, password]):
         return jsonify({'error': 'Name, email and password required'}), 400
     
+    # Check if email already exists in any user type
     if User.query.filter_by(email=email).first():
         return jsonify({'error': 'Email already registered'}), 400
     
@@ -94,22 +97,28 @@ def register():
     if SuperAdmin.query.filter_by(email=email).first():
         return jsonify({'error': 'Email already registered'}), 400
     
-    user = User(
+    # Check if signup request already exists
+    if SignupRequest.query.filter_by(email=email, status='pending').first():
+        return jsonify({'error': 'Signup request already pending approval'}), 400
+    
+    # Create signup request instead of user
+    signup_request = SignupRequest(
         name=name,
         email=email,
         phone=phone,
-        department=department
+        department=department,
+        profile_image=profile_image,
+        documents=documents
     )
-    user.set_password(password)
+    signup_request.set_password(password)
     
-    db.session.add(user)
+    db.session.add(signup_request)
     db.session.commit()
     
-    log_activity('register', 'user', user.id, user.email, 'New user registered')
-    
     return jsonify({
-        'message': 'Registration successful',
-        'user': user.to_dict()
+        'message': 'Signup request submitted successfully. Please wait for admin approval.',
+        'request_id': signup_request.id,
+        'status': 'pending'
     }), 201
 
 @auth_bp.route('/me', methods=['GET'])

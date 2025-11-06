@@ -135,6 +135,46 @@ class Person(db.Model):
         }
 
 
+class SignupRequest(db.Model):
+    """Signup request from new users requiring admin approval"""
+    __tablename__ = 'signup_requests'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    phone = db.Column(db.String(20), default='')
+    department = db.Column(db.String(100), default='')
+    profile_image = db.Column(db.Text, default='')
+    documents = db.Column(db.JSON, default=[])  # Store uploaded documents/images
+    status = db.Column(db.String(20), default='pending', index=True)  # pending, approved, rejected
+    submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    processed_at = db.Column(db.DateTime, nullable=True)
+    processed_by = db.Column(db.String(120), nullable=True)
+    rejection_reason = db.Column(db.Text, nullable=True)
+    
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+    
+    def to_dict(self, include_documents=False):
+        data = {
+            'id': self.id,
+            'name': self.name,
+            'email': self.email,
+            'phone': self.phone,
+            'department': self.department,
+            'profile_image': self.profile_image,
+            'status': self.status,
+            'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
+            'processed_at': self.processed_at.isoformat() if self.processed_at else None,
+            'processed_by': self.processed_by,
+            'rejection_reason': self.rejection_reason
+        }
+        if include_documents:
+            data['documents'] = self.documents
+        return data
+
+
 class EnrollmentRequest(db.Model):
     """Enrollment request from users"""
     __tablename__ = 'enrollment_requests'
@@ -145,6 +185,7 @@ class EnrollmentRequest(db.Model):
     email = db.Column(db.String(120), nullable=False, index=True)
     phone = db.Column(db.String(20), default='')
     images = db.Column(db.JSON, nullable=False)
+    quality_scores = db.Column(db.JSON, default=[])  # Quality scores for each image
     status = db.Column(db.String(20), default='pending', index=True)
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
     processed_at = db.Column(db.DateTime, nullable=True)
@@ -161,6 +202,7 @@ class EnrollmentRequest(db.Model):
             'email': self.email,
             'phone': self.phone,
             'status': self.status,
+            'quality_scores': self.quality_scores,
             'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
             'processed_at': self.processed_at.isoformat() if self.processed_at else None,
             'processed_by': self.processed_by,
@@ -169,6 +211,40 @@ class EnrollmentRequest(db.Model):
         if include_images:
             data['images'] = self.images
         return data
+
+
+class LeaveRequest(db.Model):
+    """Leave request from users"""
+    __tablename__ = 'leave_requests'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    start_date = db.Column(db.Date, nullable=False, index=True)
+    end_date = db.Column(db.Date, nullable=False)
+    leave_type = db.Column(db.String(50), nullable=False)  # sick, vacation, personal, etc.
+    reason = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(20), default='pending', index=True)  # pending, approved, rejected
+    submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    processed_at = db.Column(db.DateTime, nullable=True)
+    processed_by = db.Column(db.String(120), nullable=True)
+    rejection_reason = db.Column(db.Text, nullable=True)
+    
+    user = db.relationship('User', backref='leave_requests')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'start_date': self.start_date.isoformat() if self.start_date else None,
+            'end_date': self.end_date.isoformat() if self.end_date else None,
+            'leave_type': self.leave_type,
+            'reason': self.reason,
+            'status': self.status,
+            'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
+            'processed_at': self.processed_at.isoformat() if self.processed_at else None,
+            'processed_by': self.processed_by,
+            'rejection_reason': self.rejection_reason
+        }
 
 
 class Attendance(db.Model):
@@ -229,4 +305,7 @@ db.Index('idx_attendance_name_timestamp', Attendance.name, Attendance.timestamp.
 db.Index('idx_persons_status', Person.status)
 db.Index('idx_users_status', User.status)
 db.Index('idx_enrollment_status', EnrollmentRequest.status)
+db.Index('idx_signup_status', SignupRequest.status)
+db.Index('idx_leave_status', LeaveRequest.status)
+db.Index('idx_leave_dates', LeaveRequest.start_date, LeaveRequest.end_date)
 db.Index('idx_system_logs_timestamp', SystemLog.timestamp.desc())
