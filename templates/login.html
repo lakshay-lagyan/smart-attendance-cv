@@ -1,38 +1,155 @@
 {% extends "base.html" %}
 
-{% block title %}Login - Smart Attendance{% endblock %}
+{% block title %}Sign In - Smart Attendance System{% endblock %}
+
+{% block extra_styles %}
+<style>
+    body { margin: 0; padding: 0; }
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        background: #0a1929;
+    }
+    .login-left {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%);
+    }
+    .login-right {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        background: #0a1929;
+    }
+    .face-image {
+        max-width: 100%;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+    }
+    .signin-form {
+        width: 100%;
+        max-width: 400px;
+    }
+    .form-title {
+        color: #fff;
+        font-size: 2rem;
+        font-weight: 600;
+        margin-bottom: 2rem;
+    }
+    .form-label {
+        color: #94a3b8;
+        font-size: 0.875rem;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    .form-input {
+        width: 100%;
+        padding: 0.875rem 1rem;
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        color: #fff;
+        font-size: 0.9375rem;
+        transition: all 0.3s;
+        margin-bottom: 1.25rem;
+    }
+    .form-input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        background: #0f172a;
+    }
+    .form-input::placeholder {
+        color: #64748b;
+    }
+    .btn-signin {
+        width: 100%;
+        padding: 0.875rem;
+        background: #3b82f6;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        margin-top: 0.5rem;
+    }
+    .btn-signin:hover {
+        background: #2563eb;
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+    }
+    .signup-link {
+        text-align: center;
+        margin-top: 1.5rem;
+        color: #94a3b8;
+    }
+    .signup-link a {
+        color: #3b82f6;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .signup-link a:hover {
+        text-decoration: underline;
+    }
+    .app-title {
+        color: #3b82f6;
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin-bottom: 2rem;
+        letter-spacing: 0.5px;
+    }
+    @media (max-width: 768px) {
+        .login-container { flex-direction: column; }
+        .login-left { display: none; }
+        .login-right { flex: 1; }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="min-h-screen flex items-center justify-center px-4 bg-gray-50">
-    <div class="max-w-md w-full">
-        <div class="text-center mb-8">
-            <h2 class="text-3xl font-bold gradient-text">Welcome Back</h2>
-            <p class="text-gray-600 mt-2">Sign in to your account</p>
+<div class="login-container">
+    <div class="login-left">
+        <div style="max-width: 500px;">
+            <img src="https://images.unsplash.com/photo-1614064745389-869e7e9b0e59?w=600&auto=format&fit=crop" 
+                 alt="Face Recognition" 
+                 class="face-image"
+                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27500%27 height=%27600%27%3E%3Crect fill=%27%231e3a8a%27 width=%27500%27 height=%27600%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 dominant-baseline=%27middle%27 text-anchor=%27middle%27 font-family=%27Arial%27 font-size=%2724%27 fill=%27%23fff%27%3EFace Recognition%3C/text%3E%3C/svg%3E'">
         </div>
-        
-        <div class="bg-white rounded-xl card-shadow p-8">
+    </div>
+    
+    <div class="login-right">
+        <div class="signin-form">
+            <div class="app-title">Smart Attendance System</div>
+            <h1 class="form-title">Sign in</h1>
+            
             <form id="loginForm">
-                <div class="mb-6">
-                    <label class="block text-gray-700 font-semibold mb-2">Email</label>
+                <div>
+                    <label class="form-label">Email</label>
                     <input type="email" id="email" required
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                           class="form-input" 
+                           placeholder="you@company.com">
                 </div>
                 
-                <div class="mb-6">
-                    <label class="block text-gray-700 font-semibold mb-2">Password</label>
+                <div>
+                    <label class="form-label">Password</label>
                     <input type="password" id="password" required
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                           class="form-input" 
+                           placeholder="Your password">
                 </div>
                 
-                <button type="submit" class="w-full btn-primary text-white py-3 rounded-lg font-semibold">
-                    Sign In
+                <button type="submit" class="btn-signin">
+                    Sign in
                 </button>
             </form>
             
-            <div class="mt-6 text-center">
-                <p class="text-gray-600">Don't have an account? 
-                    <a href="/register" class="text-purple-600 font-semibold hover:underline">Sign Up</a>
-                </p>
+            <div class="signup-link">
+                Don't have an account? <a href="/register">Request Enrollment from Admin</a>
             </div>
         </div>
     </div>

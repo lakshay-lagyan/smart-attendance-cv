@@ -35,13 +35,21 @@
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                 </div>
                 
-                <div class="mb-6">
+                <div class="mb-4">
                     <label class="block text-gray-700 font-semibold mb-2">Password</label>
                     <input type="password" id="password" required
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
                 </div>
                 
-                <button type="submit" class="w-full btn-primary text-white py-3 rounded-lg font-semibold">
+                <div class="mb-6">
+                    <label class="block text-gray-700 font-semibold mb-2">Upload Documents (Optional)</label>
+                    <p class="text-sm text-gray-500 mb-2">Upload ID, certificates, or other verification documents</p>
+                    <input type="file" id="documents" multiple accept="image/*,.pdf"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                    <div id="filePreview" class="mt-2 grid grid-cols-2 gap-2"></div>
+                </div>
+                
+                <button type="submit" id="submitBtn" class="w-full btn-primary text-white py-3 rounded-lg font-semibold">
                     Send Request
                 </button>
             </form>
@@ -56,15 +64,58 @@
 </div>
 
 <script>
+// File preview handling
+const documentsInput = document.getElementById('documents');
+const filePreview = document.getElementById('filePreview');
+let uploadedDocuments = [];
+
+documentsInput.addEventListener('change', (e) => {
+    const files = e.target.files;
+    filePreview.innerHTML = '';
+    uploadedDocuments = [];
+    
+    for (let file of files) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            uploadedDocuments.push(event.target.result);
+            
+            const preview = document.createElement('div');
+            preview.className = 'relative';
+            
+            if (file.type.startsWith('image/')) {
+                preview.innerHTML = `
+                    <img src="${event.target.result}" class="w-full h-24 object-cover rounded border">
+                    <div class="text-xs mt-1 truncate">${file.name}</div>
+                `;
+            } else {
+                preview.innerHTML = `
+                    <div class="w-full h-24 bg-gray-100 rounded border flex items-center justify-center">
+                        <i class="fas fa-file-pdf text-3xl text-red-500"></i>
+                    </div>
+                    <div class="text-xs mt-1 truncate">${file.name}</div>
+                `;
+            }
+            
+            filePreview.appendChild(preview);
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
 document.getElementById('registerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending Request...';
     
     const data = {
         name: document.getElementById('name').value,
         email: document.getElementById('email').value,
         phone: document.getElementById('phone').value,
         department: document.getElementById('department').value,
-        password: document.getElementById('password').value
+        password: document.getElementById('password').value,
+        documents: uploadedDocuments
     };
     
     try {
@@ -77,15 +128,20 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
         const result = await response.json();
         
         if (response.ok) {
-            showToast('Registration successful! Please login.', 'success');
+            showToast('Signup request submitted! Wait for admin approval.', 'success');
             setTimeout(() => {
                 window.location.href = '/login';
-            }, 1500);
+            }, 2000);
         } else {
-            showToast(result.error || 'Registration failed', 'error');
+            showToast(result.error || 'Registration failed. Please try again.', 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Send Request';
         }
     } catch (error) {
-        showToast('Registration failed. Please try again.', 'error');
+        console.error('Registration error:', error);
+        showToast('Network error. Please check your connection and try again.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send Request';
     }
 });
 </script>

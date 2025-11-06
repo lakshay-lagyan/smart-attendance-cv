@@ -118,19 +118,25 @@ class CameraManager {
             videoElement.srcObject = this.stream;
             
             // Wait for video to be ready
-            await new Promise((resolve, reject) => {
+            return new Promise((resolve, reject) => {
                 videoElement.onloadedmetadata = () => {
+                    console.log('Video metadata loaded, starting playback...');
                     videoElement.play()
-                        .then(resolve)
+                        .then(() => {
+                            console.log('Camera started successfully');
+                            resolve(this.stream);
+                        })
                         .catch(reject);
+                };
+                
+                videoElement.onerror = (error) => {
+                    console.error('Video element error:', error);
+                    reject(new Error('Failed to load video stream'));
                 };
                 
                 // Timeout after 10 seconds
                 setTimeout(() => reject(new Error('Video load timeout')), 10000);
             });
-
-            console.log('Camera started successfully');
-            return this.stream;
 
         } catch (error) {
             console.error('Camera error:', error);

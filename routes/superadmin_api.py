@@ -228,3 +228,77 @@ def get_live_attendance():
         'attendance': [att.to_dict() for att in attendance_records],
         'count': len(attendance_records)
     })
+
+@superadmin_api_bp.route('/users/<int:user_id>/promote-to-admin', methods=['POST'])
+@require_superadmin
+def promote_user_to_admin(user_id):
+    """Promote an existing user to admin role"""
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    
+    # Check if already an admin
+    if Admin.query.filter_by(email=user.email).first():
+        return jsonify({'error': 'User is already an admin'}), 400
+    
+    identity = get_jwt_identity()
+    superadmin_id = identity.get('id')
+    
+    # Create admin with user's existing details
+    admin = Admin(
+        name=user.name,
+        email=user.email,
+        department=user.department,
+        created_by=superadmin_id
+    )
+    # Copy password hash from user
+    admin.password_hash = user.password_hash
+    
+    db.session.add(admin)
+    db.session.commit()
+    
+    log = SystemLog(
+        action='promote_to_admin',
+        user_type='superadmin',
+        user_id=superadmin_id,
+        user_email=identity.get('email'),
+        details=f'Promoted user {user.email} to admin',
+        ip_address=request.remote_addr
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'User promoted to admin successfully',
+        'admin': admin.to_dict()
+    }), 201
+
+@superadmin_api_bp.route('/admins/<int:admin_id>/demote-to-user', methods=['POST'])
+@require_superadmin
+def demote_admin_to_user(admin_id):
+    """Demote an admin back to regular user"""
+    admin = Admin.query.get(admin_id)
+    if not admin:
+        return jsonify({'error': 'Admin not found'}), 404
+    
+    # Check if user account already exists
+    if not User.query.filter_by(email=admin.email).first():
+        return jsonify({'error': 'No user account found for this admin'}), 400
+    
+    # Simply deactivate the admin role
+    admin.is_active = False
+    db.session.commit()
+    
+    identity = get_jwt_identity()
+    log = SystemLog(
+        action='demote_to_user',
+        user_type='superadmin',
+        user_id=identity.get('id'),
+        user_email=identity.get('email'),
+        details=f'Demoted admin {admin.email} to user',
+        ip_address=request.remote_addr
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    return jsonify({'message': 'Admin demoted to user successfully'})

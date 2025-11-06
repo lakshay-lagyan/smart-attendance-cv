@@ -44,10 +44,18 @@
             <button id="menuToggle" class="md:hidden text-gray-600">
                 <i class="fas fa-bars text-2xl"></i>
             </button>
-            <h2 class="text-2xl font-bold text-gray-800">Manage Admins</h2>
-            <button onclick="showCreateModal()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">
-                <i class="fas fa-plus mr-2"></i> Add Admin
-            </button>
+            <h2 class="text-2xl font-bold text-gray-800">Manage Roles</h2>
+            <div class="flex gap-2">
+                <button onclick="filterRoles('all')" id="btn-all" class="filter-btn px-4 py-2 rounded-lg bg-purple-600 text-white">
+                    All Users
+                </button>
+                <button onclick="filterRoles('admin')" id="btn-admin" class="filter-btn px-4 py-2 rounded-lg bg-gray-200 text-gray-700">
+                    Admins Only
+                </button>
+                <button onclick="filterRoles('user')" id="btn-user" class="filter-btn px-4 py-2 rounded-lg bg-gray-200 text-gray-700">
+                    Users Only
+                </button>
+            </div>
         </div>
         
         <div class="p-4 md:p-6">
@@ -59,11 +67,11 @@
                                 <th class="p-4 text-left">Name</th>
                                 <th class="p-4 text-left">Email</th>
                                 <th class="p-4 text-left hidden md:table-cell">Department</th>
-                                <th class="p-4 text-left">Status</th>
+                                <th class="p-4 text-left">Role</th>
                                 <th class="p-4 text-left">Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="adminsTable" class="divide-y">
+                        <tbody id="usersTable" class="divide-y">
                             <tr><td colspan="5" class="p-4 text-center">Loading...</td></tr>
                         </tbody>
                     </table>
@@ -73,44 +81,11 @@
     </div>
 </div>
 
-<!-- Create/Edit Modal -->
-<div id="adminModal" class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4">
-    <div class="bg-white rounded-lg max-w-md w-full">
-        <div class="p-6 border-b flex justify-between items-center">
-            <h3 id="modalTitle" class="text-xl font-bold">Add Admin</h3>
-            <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-        </div>
-        
-        <form id="adminForm" class="p-6 space-y-4">
-            <input type="hidden" id="adminId">
-            <div>
-                <label class="block font-semibold mb-2">Name</label>
-                <input type="text" id="adminName" required class="w-full px-4 py-2 border rounded-lg">
-            </div>
-            <div>
-                <label class="block font-semibold mb-2">Email</label>
-                <input type="email" id="adminEmail" required class="w-full px-4 py-2 border rounded-lg">
-            </div>
-            <div>
-                <label class="block font-semibold mb-2">Department</label>
-                <input type="text" id="adminDept" class="w-full px-4 py-2 border rounded-lg">
-            </div>
-            <div>
-                <label class="block font-semibold mb-2">Password</label>
-                <input type="password" id="adminPassword" class="w-full px-4 py-2 border rounded-lg">
-                <p id="passwordHint" class="text-sm text-gray-500 mt-1">Required for new admin</p>
-            </div>
-            <button type="submit" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">
-                Save Admin
-            </button>
-        </form>
-    </div>
-</div>
 
 <script>
+let allUsers = [];
 let admins = [];
+let currentFilter = 'all';
 
 document.addEventListener('DOMContentLoaded', () => {
     const sidebar = document.getElementById('sidebar');
@@ -120,123 +95,120 @@ document.addEventListener('DOMContentLoaded', () => {
         sidebar.classList.toggle('hidden-mobile');
     });
     
-    loadAdmins();
-    
-    document.getElementById('adminForm').addEventListener('submit', saveAdmin);
+    loadAllData();
 });
 
-async function loadAdmins() {
+async function loadAllData() {
     try {
-        const response = await apiRequest('/superadmin/admins');
-        const data = await response.json();
+        // Load both users and admins
+        const [usersResp, adminsResp] = await Promise.all([
+            apiRequest('/superadmin/users'),
+            apiRequest('/superadmin/admins')
+        ]);
         
-        if (response.ok) {
-            admins = data.admins;
-            displayAdmins(admins);
-        }
+        const usersData = await usersResp.json();
+        const adminsData = await adminsResp.json();
+        
+        if (usersResp.ok) allUsers = usersData.users;
+        if (adminsResp.ok) admins = adminsData.admins;
+        
+        displayUsers();
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error loading data:', error);
+        showToast('Failed to load users', 'error');
     }
 }
 
-function displayAdmins(adminsList) {
-    const tbody = document.getElementById('adminsTable');
+function displayUsers() {
+    const tbody = document.getElementById('usersTable');
     
-    if (adminsList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">No admins found</td></tr>';
+    // Create combined list with role information
+    const combinedList = allUsers.map(user => {
+        const isAdmin = admins.find(a => a.email === user.email && a.is_active);
+        return {
+            ...user,
+            role: isAdmin ? 'admin' : 'user',
+            adminId: isAdmin ? isAdmin.id : null
+        };
+    });
+    
+    // Filter based on current filter
+    let filteredList = combinedList;
+    if (currentFilter === 'admin') {
+        filteredList = combinedList.filter(u => u.role === 'admin');
+    } else if (currentFilter === 'user') {
+        filteredList = combinedList.filter(u => u.role === 'user');
+    }
+    
+    if (filteredList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">No users found</td></tr>';
         return;
     }
     
-    tbody.innerHTML = adminsList.map(admin => `
+    tbody.innerHTML = filteredList.map(user => `
         <tr>
-            <td class="p-4">${admin.name}</td>
-            <td class="p-4">${admin.email}</td>
-            <td class="p-4 hidden md:table-cell">${admin.department || 'N/A'}</td>
+            <td class="p-4">${user.name}</td>
+            <td class="p-4 text-sm">${user.email}</td>
+            <td class="p-4 hidden md:table-cell">${user.department || 'N/A'}</td>
             <td class="p-4">
-                <span class="px-2 py-1 rounded text-xs ${admin.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                    ${admin.is_active ? 'Active' : 'Inactive'}
+                <span class="px-3 py-1 rounded-full text-xs font-semibold ${
+                    user.role === 'admin' 
+                        ? 'bg-purple-100 text-purple-800' 
+                        : 'bg-blue-100 text-blue-800'
+                }">
+                    ${user.role === 'admin' ? 'Admin' : 'User'}
                 </span>
             </td>
             <td class="p-4">
-                <button onclick="editAdmin(${admin.id})" class="text-blue-600 hover:text-blue-800 mr-2">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button onclick="toggleAdmin(${admin.id})" class="text-red-600 hover:text-red-800">
-                    <i class="fas fa-${admin.is_active ? 'ban' : 'check'}"></i>
-                </button>
+                ${user.role === 'admin' 
+                    ? `<button onclick="demoteToUser(${user.adminId}, ${user.id})" class="px-3 py-1 bg-orange-500 text-white rounded text-sm hover:bg-orange-600">
+                        <i class="fas fa-arrow-down mr-1"></i> Demote to User
+                       </button>`
+                    : `<button onclick="promoteToAdmin(${user.id})" class="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600">
+                        <i class="fas fa-arrow-up mr-1"></i> Promote to Admin
+                       </button>`
+                }
             </td>
         </tr>
     `).join('');
 }
 
-function showCreateModal() {
-    document.getElementById('modalTitle').textContent = 'Add Admin';
-    document.getElementById('adminForm').reset();
-    document.getElementById('adminId').value = '';
-    document.getElementById('adminPassword').required = true;
-    document.getElementById('passwordHint').textContent = 'Required for new admin';
-    document.getElementById('adminModal').classList.add('active');
+function filterRoles(filter) {
+    currentFilter = filter;
+    
+    // Update button styles
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('bg-purple-600', 'text-white');
+        btn.classList.add('bg-gray-200', 'text-gray-700');
+    });
+    
+    const activeBtn = document.getElementById(`btn-${filter}`);
+    activeBtn.classList.remove('bg-gray-200', 'text-gray-700');
+    activeBtn.classList.add('bg-purple-600', 'text-white');
+    
+    displayUsers();
 }
 
-function editAdmin(id) {
-    const admin = admins.find(a => a.id === id);
-    if (!admin) return;
+async function promoteToAdmin(userId) {
+    const user = allUsers.find(u => u.id === userId);
+    if (!user) return;
     
-    document.getElementById('modalTitle').textContent = 'Edit Admin';
-    document.getElementById('adminId').value = admin.id;
-    document.getElementById('adminName').value = admin.name;
-    document.getElementById('adminEmail').value = admin.email;
-    document.getElementById('adminDept').value = admin.department || '';
-    document.getElementById('adminPassword').value = '';
-    document.getElementById('adminPassword').required = false;
-    document.getElementById('passwordHint').textContent = 'Leave blank to keep current password';
-    document.getElementById('adminModal').classList.add('active');
-}
-
-function closeModal() {
-    document.getElementById('adminModal').classList.remove('active');
-}
-
-async function saveAdmin(e) {
-    e.preventDefault();
-    
-    const id = document.getElementById('adminId').value;
-    const password = document.getElementById('adminPassword').value;
-    
-    // Validate password for new admin
-    if (!id && !password) {
-        showToast('Password is required for new admin', 'error');
+    if (!confirm(`Promote ${user.name} to Admin role?\n\nThey will have full administrative access.`)) {
         return;
     }
     
-    const data = {
-        name: document.getElementById('adminName').value,
-        email: document.getElementById('adminEmail').value,
-        department: document.getElementById('adminDept').value
-    };
-    
-    // Only include password if it's provided
-    if (password) {
-        data.password = password;
-    }
-    
     try {
-        const url = id ? `/superadmin/admins/${id}` : '/superadmin/admins';
-        const method = id ? 'PUT' : 'POST';
-        
-        const response = await apiRequest(url, {
-            method: method,
-            body: JSON.stringify(data)
+        const response = await apiRequest(`/superadmin/users/${userId}/promote-to-admin`, {
+            method: 'POST'
         });
         
         const result = await response.json();
         
         if (response.ok) {
-            showToast(id ? 'Admin updated!' : 'Admin created!', 'success');
-            closeModal();
-            loadAdmins();
+            showToast(`${user.name} promoted to Admin!`, 'success');
+            loadAllData();
         } else {
-            showToast(result.error || 'Operation failed', 'error');
+            showToast(result.error || 'Failed to promote user', 'error');
         }
     } catch (error) {
         console.error('Error:', error);
@@ -244,24 +216,26 @@ async function saveAdmin(e) {
     }
 }
 
-async function toggleAdmin(id) {
-    const admin = admins.find(a => a.id === id);
-    if (!admin) return;
+async function demoteToUser(adminId, userId) {
+    const user = allUsers.find(u => u.id === userId);
+    if (!user) return;
     
-    const action = admin.is_active ? 'deactivate' : 'activate';
-    if (!confirm(`Are you sure you want to ${action} this admin?`)) return;
+    if (!confirm(`Demote ${user.name} back to User role?\n\nThey will lose administrative access.`)) {
+        return;
+    }
     
     try {
-        const response = await apiRequest(`/superadmin/admins/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ is_active: !admin.is_active })
+        const response = await apiRequest(`/superadmin/admins/${adminId}/demote-to-user`, {
+            method: 'POST'
         });
         
+        const result = await response.json();
+        
         if (response.ok) {
-            showToast(`Admin ${action}d successfully`, 'success');
-            loadAdmins();
+            showToast(`${user.name} demoted to User!`, 'success');
+            loadAllData();
         } else {
-            showToast('Operation failed', 'error');
+            showToast(result.error || 'Failed to demote admin', 'error');
         }
     } catch (error) {
         console.error('Error:', error);
