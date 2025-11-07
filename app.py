@@ -115,6 +115,10 @@ def admin_enrollment_requests():
 
 @app.route('/user/dashboard')
 def user_dashboard():
+    # Check if modern dashboard requested or default to modern
+    use_modern = request.args.get('modern', 'true').lower() == 'true'
+    if use_modern:
+        return render_template('user/dashboard_modern.html')
     return render_template('user/dashboard_enhanced.html')
 
 from routes.auth import auth_bp

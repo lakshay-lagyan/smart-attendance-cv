@@ -1,6 +1,13 @@
 """
 Railway PostgreSQL Migration Script
-Run this on your production server to migrate the database
+Run this INSIDE Railway, not locally!
+
+CORRECT WAY:
+1. Add to Railway start command: python railway_migrate.py && gunicorn app:app
+2. Or use Railway Shell: railway shell, then: python railway_migrate.py
+
+WRONG WAY:
+❌ railway run python railway_migrate.py (from local machine - won't work!)
 """
 import os
 import logging
@@ -11,18 +18,41 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Get database URL from environment (Railway sets this automatically)
-DATABASE_URL = os.environ.get('DATABASE_URL')
+DATABASE_URL = os.environ.get('DATABASE_URL') or os.environ.get('DATABASE_PRIVATE_URL')
 
 if not DATABASE_URL:
     logger.error("❌ DATABASE_URL environment variable not set!")
-    logger.error("This script must be run on Railway or with DATABASE_URL set")
+    logger.error("This script must be run INSIDE Railway, not locally!")
+    logger.error("")
+    logger.error("To fix:")
+    logger.error("1. Go to Railway Dashboard → Your Service → Settings")
+    logger.error("2. Change Start Command to: python railway_migrate.py && gunicorn app:app")
+    logger.error("3. Redeploy")
+    logger.error("")
+    logger.error("Or use: railway shell, then run: python railway_migrate.py")
+    exit(1)
+
+# Check if running on Railway (not locally)
+if 'railway.internal' in DATABASE_URL and 'RAILWAY_ENVIRONMENT' not in os.environ:
+    logger.error("❌ Cannot run this script locally!")
+    logger.error("The DATABASE_URL points to Railway's internal network.")
+    logger.error("")
+    logger.error("✅ SOLUTION: Run migration INSIDE Railway:")
+    logger.error("1. Update Railway start command to:")
+    logger.error("   python railway_migrate.py && gunicorn app:app")
+    logger.error("")
+    logger.error("2. Or use Railway Shell:")
+    logger.error("   railway shell")
+    logger.error("   python railway_migrate.py")
+    logger.error("")
+    logger.error("3. Or deploy to Heroku/Render (they auto-run on deploy)")
     exit(1)
 
 # Fix for SQLAlchemy 1.4+ with PostgreSQL
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
-logger.info(f"Connecting to database...")
+logger.info(f"✅ Running migration on Railway...")
 
 def migrate_database():
     """Add missing columns to database tables"""
