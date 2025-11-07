@@ -81,6 +81,10 @@ def register_page():
 def superadmin_dashboard():
     return render_template('superadmin/dashboard_enhanced.html')
 
+@app.route('/superadmin/cameras')
+def superadmin_cameras():
+    return render_template('superadmin/cameras.html')
+
 @app.route('/superadmin/admins')
 def superadmin_admins():
     return render_template('superadmin/admins.html')
@@ -105,6 +109,10 @@ def admin_enrollment():
 def admin_requests():
     return render_template('admin/requests_enhanced.html')
 
+@app.route('/admin/enrollment-requests')
+def admin_enrollment_requests():
+    return render_template('admin/enrollment_requests.html')
+
 @app.route('/user/dashboard')
 def user_dashboard():
     return render_template('user/dashboard_enhanced.html')
@@ -114,12 +122,14 @@ from routes.admin_api import admin_api_bp
 from routes.superadmin_api import superadmin_api_bp
 from routes.user_api import user_api_bp
 from routes.camera_api import camera_api_bp
+from routes.enrollment_api import enrollment_api_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(admin_api_bp, url_prefix='/api/admin')
 app.register_blueprint(superadmin_api_bp, url_prefix='/api/superadmin')
 app.register_blueprint(user_api_bp, url_prefix='/api/user')
 app.register_blueprint(camera_api_bp, url_prefix='/api/cameras')
+app.register_blueprint(enrollment_api_bp, url_prefix='/api/enrollment')
 
 # Start background worker for CPU-intensive tasks
 from background_worker import background_worker

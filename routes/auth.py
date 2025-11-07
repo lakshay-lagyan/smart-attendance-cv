@@ -75,51 +75,83 @@ def login():
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
-    data = request.get_json()
-    name = data.get('name')
-    email = data.get('email')
-    password = data.get('password')
-    phone = data.get('phone', '')
-    department = data.get('department', '')
-    profile_image = data.get('profile_image', '')
-    documents = data.get('documents', [])
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        name = data.get('name')
+        email = data.get('email')
+        password = data.get('password')
+        phone = data.get('phone', '')
+        department = data.get('department', '')
+        profile_image = data.get('profile_image', '')
+        documents = data.get('documents', [])
+        client_ip = request.remote_addr
+        
+        if not all([name, email, password]):
+            return jsonify({'error': 'Name, email and password required'}), 400
+        
+        # Email validation
+        import re
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(email_pattern, email):
+            return jsonify({'error': 'Invalid email format'}), 400
+        
+        # Check if email already exists in any user type
+        if User.query.filter_by(email=email).first():
+            return jsonify({'error': 'Email already registered as active user'}), 400
+        
+        if Admin.query.filter_by(email=email).first():
+            return jsonify({'error': 'Email already registered as admin'}), 400
+        
+        if SuperAdmin.query.filter_by(email=email).first():
+            return jsonify({'error': 'Email already registered as superadmin'}), 400
+        
+        # Check if signup request already exists
+        existing_request = SignupRequest.query.filter_by(email=email).first()
+        if existing_request:
+            if existing_request.status == 'pending':
+                return jsonify({'error': 'Signup request already pending approval'}), 400
+            elif existing_request.status == 'approved':
+                return jsonify({'error': 'Email already approved. Please contact admin.'}), 400
+        
+        # Create signup request
+        signup_request = SignupRequest(
+            name=name,
+            email=email,
+            phone=phone,
+            department=department,
+            profile_image=profile_image,
+            documents=documents if isinstance(documents, list) else []
+        )
+        signup_request.set_password(password)
+        
+        db.session.add(signup_request)
+        db.session.commit()
+        
+        # Log the submission
+        log_activity(
+            'signup_request_submitted',
+            'user',
+            None,
+            email,
+            f'Signup request submitted from IP: {client_ip}'
+        )
+        
+        return jsonify({
+            'message': 'Signup request submitted successfully. Please wait for admin approval.',
+            'request_id': signup_request.id,
+            'status': 'pending'
+        }), 201
     
-    if not all([name, email, password]):
-        return jsonify({'error': 'Name, email and password required'}), 400
-    
-    # Check if email already exists in any user type
-    if User.query.filter_by(email=email).first():
-        return jsonify({'error': 'Email already registered'}), 400
-    
-    if Admin.query.filter_by(email=email).first():
-        return jsonify({'error': 'Email already registered'}), 400
-    
-    if SuperAdmin.query.filter_by(email=email).first():
-        return jsonify({'error': 'Email already registered'}), 400
-    
-    # Check if signup request already exists
-    if SignupRequest.query.filter_by(email=email, status='pending').first():
-        return jsonify({'error': 'Signup request already pending approval'}), 400
-    
-    # Create signup request instead of user
-    signup_request = SignupRequest(
-        name=name,
-        email=email,
-        phone=phone,
-        department=department,
-        profile_image=profile_image,
-        documents=documents
-    )
-    signup_request.set_password(password)
-    
-    db.session.add(signup_request)
-    db.session.commit()
-    
-    return jsonify({
-        'message': 'Signup request submitted successfully. Please wait for admin approval.',
-        'request_id': signup_request.id,
-        'status': 'pending'
-    }), 201
+    except Exception as e:
+        db.session.rollback()
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f'Registration error: {str(e)}')
+        return jsonify({'error': f'Registration failed: {str(e)}'}), 500
 
 @auth_bp.route('/me', methods=['GET'])
 @jwt_required()

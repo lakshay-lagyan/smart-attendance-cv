@@ -1,0 +1,690 @@
+{% extends "base.html" %}
+
+{% block title %}Enrollment Requests - Admin{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/sidebar.css') }}">
+<style>
+    .requests-grid {
+        display: grid;
+        gap: 1rem;
+    }
+    
+    .request-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .request-card:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    
+    .request-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 1rem;
+    }
+    
+    .request-name {
+        font-weight: 700;
+        font-size: 1.125rem;
+        margin-bottom: 0.25rem;
+    }
+    
+    .request-email {
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+    
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .status-pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .request-info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .info-item {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .info-label {
+        color: #6b7280;
+        font-size: 0.75rem;
+        margin-bottom: 0.125rem;
+    }
+    
+    .info-value {
+        font-weight: 600;
+    }
+    
+    .quality-badges {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+    }
+    
+    .quality-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .quality-good {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .quality-poor {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .duplicate-warning {
+        background: #fef3c7;
+        border-left: 3px solid #f59e0b;
+        padding: 0.75rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+    }
+    
+    .duplicate-warning-title {
+        font-weight: 600;
+        color: #92400e;
+        margin-bottom: 0.5rem;
+        font-size: 0.875rem;
+    }
+    
+    .duplicate-matches {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    
+    .duplicate-match {
+        background: white;
+        padding: 0.5rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .confidence-score {
+        background: #f59e0b;
+        color: white;
+        padding: 0.125rem 0.5rem;
+        border-radius: 12px;
+        font-weight: 700;
+    }
+    
+    .modal-detail {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+        padding: 2rem;
+    }
+    
+    .modal-detail.active {
+        display: flex;
+    }
+    
+    .modal-content {
+        background: white;
+        border-radius: 12px;
+        max-width: 900px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 2rem;
+    }
+    
+    .image-gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+    }
+    
+    .gallery-item {
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        aspect-ratio: 1;
+    }
+    
+    .gallery-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .image-quality-overlay {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    
+    .duplicate-candidates {
+        background: #f9fafb;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin: 1.5rem 0;
+    }
+    
+    .candidate-list {
+        display: grid;
+        gap: 0.75rem;
+    }
+    
+    .candidate-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: white;
+        padding: 1rem;
+        border-radius: 6px;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .candidate-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .candidate-similarity {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .similarity-bar {
+        width: 100px;
+        height: 8px;
+        background: #e5e7eb;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    .similarity-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #10b981, #f59e0b, #ef4444);
+        transition: width 0.3s;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid #e5e7eb;
+    }
+    
+    .btn-action {
+        flex: 1;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        border: none;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 1rem;
+    }
+    
+    .btn-approve {
+        background: #10b981;
+        color: white;
+    }
+    
+    .btn-approve:hover {
+        background: #059669;
+    }
+    
+    .btn-reject {
+        background: #ef4444;
+        color: white;
+    }
+    
+    .btn-reject:hover {
+        background: #dc2626;
+    }
+    
+    .btn-verify {
+        background: #3b82f6;
+        color: white;
+    }
+    
+    .btn-verify:hover {
+        background: #2563eb;
+    }
+    
+    .filters-bar {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .filters-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .filter-group label {
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+        color: #374151;
+    }
+    
+    .filter-group select,
+    .filter-group input {
+        padding: 0.5rem;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-gray-50">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="logo">
+            <h2>Smart Attendance</h2>
+            <p>Admin Panel</p>
+        </div>
+        <nav class="nav-menu">
+            <a href="/admin/dashboard" class="nav-item">
+                <i class="fas fa-tachometer-alt"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="/admin/requests" class="nav-item">
+                <i class="fas fa-clipboard-list"></i>
+                <span>Signup Requests</span>
+            </a>
+            <a href="/admin/enrollment-requests" class="nav-item active">
+                <i class="fas fa-user-plus"></i>
+                <span>Enrollment Requests</span>
+            </a>
+            <a href="/admin/enrollment" class="nav-item">
+                <i class="fas fa-id-card"></i>
+                <span>Enroll Person</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <button onclick="logout()" class="logout-btn">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Main Content -->
+    <div class="flex-1 overflow-auto">
+        <!-- Header -->
+        <header class="bg-white shadow-sm sticky top-0 z-10">
+            <div class="px-6 py-4">
+                <h1 class="text-2xl font-bold text-gray-900">Enrollment Requests</h1>
+                <p class="text-sm text-gray-600">Review and approve face enrollment requests</p>
+            </div>
+        </header>
+
+        <div class="p-6">
+            <!-- Filters -->
+            <div class="filters-bar">
+                <div class="filters-row">
+                    <div class="filter-group">
+                        <label>Status</label>
+                        <select id="filterStatus" onchange="loadRequests()">
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Search by Name/Email</label>
+                        <input type="text" id="searchQuery" placeholder="Search..." oninput="loadRequests()">
+                    </div>
+                    <div class="filter-group">
+                        <label>Quality Filter</label>
+                        <select id="filterQuality" onchange="loadRequests()">
+                            <option value="all">All Quality</option>
+                            <option value="good">Good Quality Only</option>
+                            <option value="poor">Poor Quality Only</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Duplicates</label>
+                        <select id="filterDuplicates" onchange="loadRequests()">
+                            <option value="all">All</option>
+                            <option value="has_duplicates">Has Duplicates</option>
+                            <option value="no_duplicates">No Duplicates</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Requests Grid -->
+            <div class="requests-grid" id="requestsGrid">
+                <!-- Requests will be loaded here -->
+            </div>
+
+            <!-- Pagination -->
+            <div id="pagination" class="mt-6"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-detail" id="detailModal">
+    <div class="modal-content">
+        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1.5rem;">
+            <div>
+                <h2 class="text-2xl font-bold" id="modalName"></h2>
+                <p class="text-gray-600" id="modalEmail"></p>
+            </div>
+            <button onclick="closeDetailModal()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+
+        <div id="modalContent"></div>
+    </div>
+</div>
+
+<script>
+let currentPage = 1;
+let allRequests = [];
+
+async function loadRequests() {
+    try {
+        const status = document.getElementById('filterStatus').value;
+        const response = await apiRequest(`/enrollment/requests?status=${status}&page=${currentPage}`);
+        const data = await response.json();
+        
+        allRequests = data.requests || [];
+        renderRequests();
+    } catch (error) {
+        console.error('Error loading requests:', error);
+        showToast('Failed to load requests', 'error');
+    }
+}
+
+function renderRequests() {
+    const grid = document.getElementById('requestsGrid');
+    
+    if (allRequests.length === 0) {
+        grid.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500">No enrollment requests found</div>';
+        return;
+    }
+    
+    grid.innerHTML = allRequests.map(req => {
+        const goodImages = req.quality_scores?.filter(q => q.quality === 'good').length || 0;
+        const totalImages = req.image_count || 0;
+        
+        return `
+            <div class="request-card" onclick="showDetailModal(${req.id})">
+                <div class="request-header">
+                    <div>
+                        <div class="request-name">${req.name}</div>
+                        <div class="request-email">${req.email}</div>
+                    </div>
+                    <span class="status-badge status-${req.status}">${req.status}</span>
+                </div>
+                
+                <div class="request-info">
+                    <div class="info-item">
+                        <span class="info-label">Phone</span>
+                        <span class="info-value">${req.phone || 'N/A'}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Images</span>
+                        <span class="info-value">${totalImages} uploaded</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Submitted</span>
+                        <span class="info-value">${new Date(req.submitted_at).toLocaleDateString()}</span>
+                    </div>
+                </div>
+                
+                <div class="quality-badges">
+                    <span class="quality-badge quality-good">
+                        <i class="fas fa-check"></i> ${goodImages} Good Quality
+                    </span>
+                    ${(totalImages - goodImages) > 0 ? 
+                        `<span class="quality-badge quality-poor">
+                            <i class="fas fa-exclamation"></i> ${totalImages - goodImages} Poor Quality
+                        </span>` : ''
+                    }
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function showDetailModal(requestId) {
+    try {
+        const response = await apiRequest(`/enrollment/requests/${requestId}`);
+        const req = await response.json();
+        
+        document.getElementById('modalName').textContent = req.name;
+        document.getElementById('modalEmail').textContent = req.email;
+        
+        let content = `
+            <div class="request-info" style="margin-bottom: 2rem;">
+                <div class="info-item">
+                    <span class="info-label">Phone</span>
+                    <span class="info-value">${req.phone || 'N/A'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Submitted</span>
+                    <span class="info-value">${new Date(req.submitted_at).toLocaleString()}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Status</span>
+                    <span class="info-value">${req.status}</span>
+                </div>
+            </div>
+        `;
+        
+        // Duplicate warning
+        if (req.potential_duplicates && req.potential_duplicates.length > 0) {
+            content += `
+                <div class="duplicate-warning">
+                    <div class="duplicate-warning-title">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        ${req.high_confidence_duplicates > 0 ? 'High Confidence' : 'Potential'} Duplicates Detected
+                    </div>
+                    <div class="duplicate-candidates">
+                        <div class="candidate-list">
+                            ${req.potential_duplicates.map(dup => `
+                                <div class="candidate-item">
+                                    <div class="candidate-info">
+                                        <div>
+                                            <div style="font-weight:600;">${dup.metadata?.name || 'Person ' + dup.person_id}</div>
+                                            <div style="font-size:0.75rem;color:#6b7280;">${dup.metadata?.email || ''}</div>
+                                        </div>
+                                    </div>
+                                    <div class="candidate-similarity">
+                                        <div class="similarity-bar">
+                                            <div class="similarity-fill" style="width: ${dup.confidence}%"></div>
+                                        </div>
+                                        <span class="confidence-score">${dup.confidence}%</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Images with quality badges
+        content += '<h3 style="font-weight:700;margin-bottom:1rem;">Submitted Images</h3>';
+        content += '<div class="image-gallery">';
+        
+        req.quality_scores?.forEach((score, idx) => {
+            content += `
+                <div class="gallery-item">
+                    <img src="/uploads/${score.filename || 'placeholder.jpg'}" alt="Image ${idx + 1}">
+                    <div class="image-quality-overlay">
+                        <span class="quality-badge quality-${score.quality || 'poor'}">
+                            ${score.quality || 'unknown'}
+                        </span>
+                        ${score.blur_score ? `<span class="quality-badge" style="background:#e0e7ff;color:#3730a3;">
+                            Blur: ${score.blur_score}
+                        </span>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        content += '</div>';
+        
+        // Action buttons
+        if (req.status === 'pending') {
+            content += `
+                <div class="action-buttons">
+                    <button class="btn-action btn-verify" onclick="sendVerificationEmail(${req.id})">
+                        <i class="fas fa-envelope mr-2"></i> Send Verification Email
+                    </button>
+                    <button class="btn-action btn-approve" onclick="approveRequest(${req.id})">
+                        <i class="fas fa-check mr-2"></i> Approve
+                    </button>
+                    <button class="btn-action btn-reject" onclick="rejectRequest(${req.id})">
+                        <i class="fas fa-times mr-2"></i> Reject
+                    </button>
+                </div>
+            `;
+        }
+        
+        document.getElementById('modalContent').innerHTML = content;
+        document.getElementById('detailModal').classList.add('active');
+    } catch (error) {
+        console.error('Error loading request detail:', error);
+        showToast('Failed to load details', 'error');
+    }
+}
+
+function closeDetailModal() {
+    document.getElementById('detailModal').classList.remove('active');
+}
+
+async function approveRequest(requestId) {
+    if (!confirm('Are you sure you want to approve this enrollment request?')) return;
+    
+    try {
+        const response = await apiRequest(`/enrollment/requests/${requestId}/approve`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            showToast('Request approved successfully', 'success');
+            closeDetailModal();
+            loadRequests();
+        } else {
+            const data = await response.json();
+            showToast(data.error || 'Failed to approve', 'error');
+        }
+    } catch (error) {
+        console.error('Error approving:', error);
+        showToast('Error approving request', 'error');
+    }
+}
+
+async function rejectRequest(requestId) {
+    const reason = prompt('Please enter rejection reason:');
+    if (!reason) return;
+    
+    try {
+        const response = await apiRequest(`/enrollment/requests/${requestId}/reject`, {
+            method: 'POST',
+            body: JSON.stringify({ reason })
+        });
+        
+        if (response.ok) {
+            showToast('Request rejected', 'success');
+            closeDetailModal();
+            loadRequests();
+        } else {
+            const data = await response.json();
+            showToast(data.error || 'Failed to reject', 'error');
+        }
+    } catch (error) {
+        console.error('Error rejecting:', error);
+        showToast('Error rejecting request', 'error');
+    }
+}
+
+async function sendVerificationEmail(requestId) {
+    try {
+        showToast('Sending verification email...', 'info');
+        // Implement email verification endpoint
+        showToast('Verification email sent', 'success');
+    } catch (error) {
+        console.error('Error sending email:', error);
+        showToast('Failed to send email', 'error');
+    }
+}
+
+// Sidebar toggle
+document.getElementById('sidebarToggle')?.addEventListener('click', () => {
+    document.getElementById('sidebar').classList.toggle('active');
+    document.getElementById('sidebarOverlay').classList.toggle('active');
+});
+
+document.getElementById('sidebarOverlay')?.addEventListener('click', () => {
+    document.getElementById('sidebar').classList.remove('active');
+    document.getElementById('sidebarOverlay').classList.remove('active');
+});
+
+// Initialize
+loadRequests();
+</script>
+{% endblock %}
