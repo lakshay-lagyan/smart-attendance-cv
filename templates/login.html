@@ -306,5 +306,63 @@
   };
 
 })();
+
+// Login form handler
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Signing in...';
+    
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    
+    if (!email || !password) {
+        showToast('Please enter both email and password', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            setToken(data.access_token);
+            setUserData(data.user);
+            showToast('Login successful!', 'success');
+            
+            // Redirect based on user type
+            setTimeout(() => {
+                if (data.user_type === 'superadmin') {
+                    window.location.href = '/superadmin/dashboard';
+                } else if (data.user_type === 'admin') {
+                    window.location.href = '/admin/dashboard';
+                } else {
+                    window.location.href = '/user/dashboard';
+                }
+            }, 500);
+        } else {
+            showToast(data.error || 'Login failed. Please check your credentials.', 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        showToast('Connection error. Please check your internet and try again.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    }
+});
 </script>
 {% endblock %}

@@ -2,9 +2,10 @@ import os
 import logging
 from datetime import datetime
 from dotenv import load_dotenv
-from flask import Flask, render_template
+from flask import Flask, render_template, jsonify, request
 from flask_jwt_extended import JWTManager
 from flask_compress import Compress
+from flask_cors import CORS
 
 load_dotenv()
 
@@ -16,6 +17,15 @@ app = Flask(__name__, static_folder='static', template_folder='templates')
 
 env = os.getenv('FLASK_ENV', 'development')
 app.config.from_object(config[env])
+
+# Enable CORS for API endpoints
+CORS(app, resources={
+    r"/api/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 db.init_app(app)
 jwt = JWTManager(app)
@@ -56,7 +66,8 @@ def init_database():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    response = render_template('index.html')
+    return response
 
 @app.route('/login')
 def login_page():
@@ -102,11 +113,41 @@ from routes.auth import auth_bp
 from routes.admin_api import admin_api_bp
 from routes.superadmin_api import superadmin_api_bp
 from routes.user_api import user_api_bp
+from routes.camera_api import camera_api_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(admin_api_bp, url_prefix='/api/admin')
 app.register_blueprint(superadmin_api_bp, url_prefix='/api/superadmin')
 app.register_blueprint(user_api_bp, url_prefix='/api/user')
+app.register_blueprint(camera_api_bp, url_prefix='/api/cameras')
+
+# Start background worker for CPU-intensive tasks
+from background_worker import background_worker
+background_worker.start()
+logger.info("Background worker started")
+
+# Performance optimization - add caching headers for static assets
+@app.after_request
+def add_header(response):
+    # Cache static files for 1 hour
+    if request.path.startswith('/static/'):
+        response.cache_control.max_age = 3600
+        response.cache_control.public = True
+    return response
+
+# Error handlers
+@app.errorhandler(404)
+def not_found(error):
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Endpoint not found'}), 404
+    return render_template('index.html'), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f'Internal error: {error}')
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Internal server error'}), 500
+    return jsonify({'error': 'Internal server error'}), 500
 
 # Initialize database on startup (works with gunicorn too)
 with app.app_context():
