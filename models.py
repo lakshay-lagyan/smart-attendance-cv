@@ -311,7 +311,7 @@ class SystemLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     action = db.Column(db.String(100), nullable=False)
     user_type = db.Column(db.String(20), nullable=False)  # superadmin, admin, user
-    user_id = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.Integer, nullable=True)  # Nullable for pre-registration logs
     user_email = db.Column(db.String(120), nullable=False)
     details = db.Column(db.Text)
     ip_address = db.Column(db.String(50))

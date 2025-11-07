@@ -162,6 +162,73 @@ def migrate_database():
                 else:
                     raise
             
+            # Check and modify system_logs table to allow NULL user_id
+            logger.info("Checking system_logs table...")
+            
+            # For SQLite, we need to check if the column constraint needs modification
+            try:
+                # Check if system_logs table exists and has data
+                result = db.session.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='system_logs'"))
+                if result.fetchone():
+                    # SQLite doesn't support ALTER COLUMN directly, so we need to recreate the table
+                    # First, check if user_id already allows NULL
+                    try:
+                        db.session.execute(text("""
+                            INSERT INTO system_logs (action, user_type, user_id, user_email, ip_address)
+                            VALUES ('test', 'user', NULL, 'test@example.com', '0.0.0.0')
+                        """))
+                        db.session.rollback()
+                        logger.info("⏭️  system_logs.user_id already allows NULL")
+                    except Exception as test_e:
+                        if "NOT NULL constraint failed" in str(test_e):
+                            db.session.rollback()
+                            # Need to modify the table
+                            logger.info("Modifying system_logs table to allow NULL user_id...")
+                            
+                            # Create a temporary table with the new schema
+                            db.session.execute(text("""
+                                CREATE TABLE system_logs_new (
+                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                    action VARCHAR(100) NOT NULL,
+                                    user_type VARCHAR(20) NOT NULL,
+                                    user_id INTEGER,
+                                    user_email VARCHAR(120) NOT NULL,
+                                    details TEXT,
+                                    ip_address VARCHAR(50),
+                                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                                )
+                            """))
+                            
+                            # Copy existing data
+                            db.session.execute(text("""
+                                INSERT INTO system_logs_new (id, action, user_type, user_id, user_email, details, ip_address, timestamp)
+                                SELECT id, action, user_type, user_id, user_email, details, ip_address, timestamp
+                                FROM system_logs
+                            """))
+                            
+                            # Drop old table and rename new one
+                            db.session.execute(text("DROP TABLE system_logs"))
+                            db.session.execute(text("ALTER TABLE system_logs_new RENAME TO system_logs"))
+                            
+                            # Recreate index
+                            db.session.execute(text("""
+                                CREATE INDEX idx_system_logs_timestamp ON system_logs (timestamp DESC)
+                            """))
+                            
+                            db.session.commit()
+                            logger.info("✅ Modified system_logs table to allow NULL user_id")
+                        else:
+                            db.session.rollback()
+                            raise
+                else:
+                    logger.info("⏭️  system_logs table doesn't exist yet")
+            except Exception as e:
+                if "already exists" in str(e).lower() or "table" in str(e).lower() and "exists" in str(e).lower():
+                    logger.info("⏭️  system_logs migration already applied or table structure is correct")
+                    db.session.rollback()
+                else:
+                    raise
+            
             logger.info("\n✅ Database migration completed successfully!")
             logger.info("All required columns have been added or already exist.")
             
