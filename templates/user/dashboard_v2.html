@@ -1,0 +1,509 @@
+{% extends "base_new.html" %}
+
+{% block title %}User Dashboard - Smart Attendance{% endblock %}
+
+{% block extra_styles %}
+<style>
+    body {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+    }
+    
+    .page-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 0 0 2rem 2rem;
+        box-shadow: 0 10px 40px rgba(102, 126, 234, 0.3);
+        margin-bottom: 2rem;
+    }
+    
+    .header-greeting {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .header-subtitle {
+        font-size: 1rem;
+        opacity: 0.9;
+    }
+    
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .action-card {
+        background: white;
+        border-radius: 1.5rem;
+        padding: 2rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s;
+        transform-style: preserve-3d;
+    }
+    
+    .action-card:hover {
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    }
+    
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .quick-action {
+        background: white;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    
+    .quick-action:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+    }
+    
+    .quick-action-icon {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 1rem;
+        border-radius: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+    }
+    
+    .timeline {
+        background: white;
+        border-radius: 1.5rem;
+        padding: 2rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+    
+    .timeline-item {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem 0;
+        border-left: 3px solid #e5e7eb;
+        padding-left: 1.5rem;
+        margin-left: 0.5rem;
+        position: relative;
+    }
+    
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -8px;
+        top: 1.5rem;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        box-shadow: 0 0 0 4px white, 0 0 0 6px #667eea;
+    }
+    
+    .timeline-item:last-child {
+        border-left-color: transparent;
+    }
+    
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    
+    .status-present {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .status-absent {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .status-late {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .camera-preview {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 4/3;
+        background: #1f2937;
+        border-radius: 1rem;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .camera-placeholder {
+        text-align: center;
+        color: #9ca3af;
+    }
+    
+    #video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    
+    .capture-btn {
+        position: absolute;
+        bottom: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: white;
+        border: 4px solid #667eea;
+        cursor: pointer;
+        transition: all 0.3s;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    
+    .capture-btn:hover {
+        transform: translateX(-50%) scale(1.1);
+    }
+    
+    .capture-btn:active {
+        transform: translateX(-50%) scale(0.95);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="main-content">
+    <!-- Sidebar -->
+    <div class="sidebar user">
+        <div class="sidebar-logo">
+            <div class="sidebar-logo-icon">
+                <i class="fas fa-user-check"></i>
+            </div>
+            <div class="sidebar-logo-text">
+                <h2 class="sidebar-logo-title">User Panel</h2>
+                <p class="sidebar-logo-subtitle">Attendance System</p>
+            </div>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="/user/dashboard" class="nav-link active">
+                            <span class="nav-icon"><i class="fas fa-home"></i></span>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/user/attendance" class="nav-link">
+                            <span class="nav-icon"><i class="fas fa-clock"></i></span>
+                            <span>Mark Attendance</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/user/enrollment" class="nav-link">
+                            <span class="nav-icon"><i class="fas fa-id-card"></i></span>
+                            <span>Enrollment</span>
+                            <span class="nav-badge" id="enrollmentBadge" style="display: none;">!</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/user/history" class="nav-link">
+                            <span class="nav-icon"><i class="fas fa-history"></i></span>
+                            <span>History</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/user/leaves" class="nav-link">
+                            <span class="nav-icon"><i class="fas fa-calendar-alt"></i></span>
+                            <span>Leave Requests</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/user/profile" class="nav-link">
+                            <span class="nav-icon"><i class="fas fa-user-cog"></i></span>
+                            <span>Profile</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        
+        <div class="sidebar-bottom">
+            <div class="sidebar-profile" id="userProfile">
+                <div class="sidebar-profile-avatar">
+                    <span id="userInitials">U</span>
+                </div>
+                <div class="sidebar-profile-info">
+                    <p class="sidebar-profile-name" id="userName">Loading...</p>
+                    <p class="sidebar-profile-role">User</p>
+                </div>
+            </div>
+            <button class="btn-logout" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Mobile Toggle -->
+    <button class="sidebar-toggle" onclick="toggleSidebar()">
+        <i class="fas fa-bars"></i>
+    </button>
+    
+    <!-- Main Content Area -->
+    <div style="margin-left: 280px; padding: 2rem;">
+        <!-- Header -->
+        <div class="page-header">
+            <h1 class="header-greeting">Welcome back, <span id="greetingName">User</span>!</h1>
+            <p class="header-subtitle">Here's your attendance summary for today</p>
+        </div>
+        
+        <!-- Stats Grid -->
+        <div class="stat-grid">
+            <div class="stat-card">
+                <div class="stat-icon gradient-primary">
+                    <i class="fas fa-calendar-check"></i>
+                </div>
+                <div>
+                    <div class="stat-value" id="totalAttendance">0</div>
+                    <div class="stat-label">Total Attendance</div>
+                    <div class="stat-trend stat-trend-up" style="display: none;">
+                        <i class="fas fa-arrow-up"></i>
+                        <span>+12% this month</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white;">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div>
+                    <div class="stat-value" id="todayStatus">-</div>
+                    <div class="stat-label">Today's Status</div>
+                    <div id="todayTime" class="text-sm" style="color: #6b7280; margin-top: 0.5rem;"></div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #4facfe, #00f2fe); color: white;">
+                    <i class="fas fa-percentage"></i>
+                </div>
+                <div>
+                    <div class="stat-value" id="attendanceRate">0%</div>
+                    <div class="stat-label">Attendance Rate</div>
+                    <div class="stat-trend stat-trend-up" id="rateTrend" style="display: none;">
+                        <i class="fas fa-arrow-up"></i>
+                        <span id="rateTrendText"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: linear-gradient(135deg, #a8edea, #fed6e3); color: #667eea;">
+                    <i class="fas fa-user-clock"></i>
+                </div>
+                <div>
+                    <div class="stat-value" id="lateCount">0</div>
+                    <div class="stat-label">Late Arrivals</div>
+                    <div class="text-sm" style="color: #6b7280; margin-top: 0.5rem;">Last 30 days</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <h3 style="margin-bottom: 1rem; color: #1f2937; font-size: 1.25rem; font-weight: 700;">Quick Actions</h3>
+        <div class="quick-actions">
+            <div class="quick-action" onclick="markAttendance()">
+                <div class="quick-action-icon">
+                    <i class="fas fa-fingerprint"></i>
+                </div>
+                <h4 style="font-weight: 600; margin-bottom: 0.5rem;">Mark Attendance</h4>
+                <p style="font-size: 0.875rem; color: #6b7280;">Check in with face recognition</p>
+            </div>
+            
+            <div class="quick-action" onclick="window.location.href='/user/enrollment'">
+                <div class="quick-action-icon" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+                    <i class="fas fa-camera"></i>
+                </div>
+                <h4 style="font-weight: 600; margin-bottom: 0.5rem;">Update Face Data</h4>
+                <p style="font-size: 0.875rem; color: #6b7280;">Improve recognition accuracy</p>
+            </div>
+            
+            <div class="quick-action" onclick="window.location.href='/user/leaves'">
+                <div class="quick-action-icon" style="background: linear-gradient(135deg, #4facfe, #00f2fe);">
+                    <i class="fas fa-umbrella-beach"></i>
+                </div>
+                <h4 style="font-weight: 600; margin-bottom: 0.5rem;">Request Leave</h4>
+                <p style="font-size: 0.875rem; color: #6b7280;">Apply for time off</p>
+            </div>
+            
+            <div class="quick-action" onclick="window.location.href='/user/history'">
+                <div class="quick-action-icon" style="background: linear-gradient(135deg, #a8edea, #fed6e3);">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h4 style="font-weight: 600; margin-bottom: 0.5rem;">View Reports</h4>
+                <p style="font-size: 0.875rem; color: #6b7280;">Check attendance details</p>
+            </div>
+        </div>
+        
+        <!-- Recent Activity -->
+        <h3 style="margin-bottom: 1rem; color: #1f2937; font-size: 1.25rem; font-weight: 700;">Recent Activity</h3>
+        <div class="timeline">
+            <div id="activityTimeline">
+                <div style="text-align: center; padding: 2rem; color: #9ca3af;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem;"></i>
+                    <p style="margin-top: 1rem;">Loading recent activity...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sidebar Overlay (Mobile) -->
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Sidebar toggle for mobile
+    function toggleSidebar() {
+        document.querySelector('.sidebar').classList.toggle('mobile-open');
+        document.querySelector('.sidebar-overlay').classList.toggle('active');
+    }
+    
+    // Mark Attendance Function
+    function markAttendance() {
+        window.location.href = '/user/attendance';
+    }
+    
+    // Load user data
+    async function loadUserData() {
+        try {
+            const userData = getUserData();
+            if (userData) {
+                document.getElementById('userName').textContent = userData.name;
+                document.getElementById('greetingName').textContent = userData.name.split(' ')[0];
+                
+                // Set initials
+                const initials = userData.name.split(' ').map(n => n[0]).join('');
+                document.getElementById('userInitials').textContent = initials;
+            }
+            
+            // Load stats
+            const stats = await apiRequest('/api/user/stats');
+            if (stats) {
+                document.getElementById('totalAttendance').textContent = stats.total_attendance || 0;
+                document.getElementById('attendanceRate').textContent = `${Math.round(stats.on_time_percentage || 0)}%`;
+                document.getElementById('lateCount').textContent = stats.late_count || 0;
+                
+                // Today's status
+                if (stats.today_marked) {
+                    document.getElementById('todayStatus').textContent = 'Present';
+                    document.getElementById('todayStatus').className = 'stat-value';
+                    document.getElementById('todayStatus').style.color = '#10b981';
+                    
+                    if (stats.today_time) {
+                        document.getElementById('todayTime').textContent = `Checked in at ${formatTime(stats.today_time)}`;
+                    }
+                } else {
+                    document.getElementById('todayStatus').textContent = 'Not Marked';
+                    document.getElementById('todayStatus').style.color = '#ef4444';
+                }
+                
+                // Show enrollment badge if not enrolled
+                const info = await apiRequest('/api/user/info');
+                if (info && !info.is_enrolled) {
+                    document.getElementById('enrollmentBadge').style.display = 'flex';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading user data:', error);
+            showToast('Failed to load user data', 'error');
+        }
+    }
+    
+    // Load recent activity
+    async function loadRecentActivity() {
+        try {
+            const response = await apiRequest('/api/user/attendance/history?per_page=5');
+            const timeline = document.getElementById('activityTimeline');
+            
+            if (response.attendance && response.attendance.length > 0) {
+                timeline.innerHTML = response.attendance.map(record => `
+                    <div class="timeline-item">
+                        <div style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+                                <span class="status-badge ${record.is_late ? 'status-late' : 'status-present'}">
+                                    <i class="fas fa-${record.is_late ? 'clock' : 'check'}"></i>
+                                    ${record.is_late ? 'Late' : 'On Time'}
+                                </span>
+                                <span style="font-size: 0.875rem; color: #6b7280;">
+                                    ${formatDateTime(record.timestamp)}
+                                </span>
+                            </div>
+                            <p style="font-weight: 600; color: #1f2937; margin-bottom: 0.25rem;">
+                                Attendance Marked
+                            </p>
+                            <p style="font-size: 0.875rem; color: #6b7280;">
+                                Confidence: ${Math.round((record.confidence || 0) * 100)}%
+                            </p>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                timeline.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #9ca3af;">
+                        <i class="fas fa-inbox" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p>No attendance records yet</p>
+                        <button class="btn btn-primary" onclick="markAttendance()" style="margin-top: 1rem;">
+                            Mark Your First Attendance
+                        </button>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error loading activity:', error);
+            document.getElementById('activityTimeline').innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: #ef4444;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                    <p>Failed to load recent activity</p>
+                </div>
+            `;
+        }
+    }
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadUserData();
+        loadRecentActivity();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            loadUserData();
+            loadRecentActivity();
+        }, 30000);
+    });
+</script>
+{% endblock %}
