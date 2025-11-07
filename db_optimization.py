@@ -1,7 +1,3 @@
-"""
-Database optimization script
-Adds indexes to frequently queried columns for better performance
-"""
 from app import app, db
 from models import User, Person, SignupRequest, EnrollmentRequest, LeaveRequest, Attendance, SystemLog
 
