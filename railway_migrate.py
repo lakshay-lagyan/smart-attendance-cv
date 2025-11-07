@@ -81,6 +81,9 @@ def migrate_database():
                 ("ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS processed_by VARCHAR(255)", "processed_by to enrollment_requests"),
                 ("ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS processed_at TIMESTAMP", "processed_at to enrollment_requests"),
                 ("ALTER TABLE enrollment_requests ADD COLUMN IF NOT EXISTS rejection_reason TEXT", "rejection_reason to enrollment_requests"),
+                
+                # System logs table - Allow NULL user_id for pre-registration logs
+                ("ALTER TABLE system_logs ALTER COLUMN user_id DROP NOT NULL", "user_id nullable in system_logs"),
             ]
             
             for sql, description in migrations:
